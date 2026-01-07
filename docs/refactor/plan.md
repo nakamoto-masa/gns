@@ -32,7 +32,7 @@ Perform minimal refactoring to make the model easier to use for end users.
 - Prioritize separation of responsibilities
 - Clear distinction between modules and scripts
 
-## Implementation Steps (9 Stages)
+## Implementation Steps (7 Stages)
 
 ### Phase 0: Environment Setup (Step 0)
 
@@ -65,33 +65,8 @@ Set up a modern Python environment first to enable efficient refactoring work.
 2. **Create new file**: `.python-version`
    - Specify Python version for uv (3.13)
 
-3. **Create new script**: `scripts/setup/setup_uv_environment.sh`
-   - Install uv
-   - Create Python 3.13 environment
-   - Install dependencies
-   - Example:
-     ```bash
-     #!/bin/bash
-     # Install uv if not already installed
-     if ! command -v uv &> /dev/null; then
-         curl -LsSf https://astral.sh/uv/install.sh | sh
-     fi
-
-     # Create virtual environment with Python 3.13
-     uv venv --python 3.13
-
-     # Activate and install dependencies
-     source .venv/bin/activate
-     uv pip install -e .
-     ```
-
-4. **Preserve existing files**: `requirements.txt`, `enviornment.yml`
-   - Keep for backward compatibility
-   - Add deprecation comment at top: "DEPRECATED: Use pyproject.toml instead"
-
-5. **Update `.gitignore`**:
-   - Add `.venv/` (uv virtual environment)
-   - Add `uv.lock` (dependency lock file)
+3. **Delete existing files**: `requirements.txt`, `enviornment.yml`
+   - Consolidate into `pyproject.toml`
 
 **Resolves**:
 - pyright-lsp works properly, enabling type checking and code completion during refactoring
@@ -99,17 +74,15 @@ Set up a modern Python environment first to enable efficient refactoring work.
 - Proactively solves Issue 1 (environment definition unification)
 
 **Impact**:
-- New files: `pyproject.toml`, `.python-version`, `scripts/setup/setup_uv_environment.sh`
-- Modified files: `requirements.txt`, `enviornment.yml` (add deprecation comment)
-- `.gitignore`
+- New files: `pyproject.toml`, `.python-version`
+- Deleted files: `requirements.txt`, `enviornment.yml`
 
 **Validation**:
 ```bash
 # Setup uv environment
-bash scripts/setup/setup_uv_environment.sh
-
-# Activate virtual environment
+uv venv --python 3.13
 source .venv/bin/activate
+uv pip install -e .
 
 # Check dependencies
 uv pip list
@@ -221,26 +194,25 @@ ls rollouts/test/
 
 **Changes**:
 
-1. **Modify existing file**: `gns/learned_simulator.py`
-   - Rename `LearnedSimulator` to `GraphNeuralNetworkModel`
+1. **Create new file**: `gns/graph_model.py`
+   - Create new `GraphNeuralNetworkModel` class
    - Responsibilities: Graph construction, message passing, forward pass
-   - Remove: Normalization statistics, boundary conditions (move to PhysicsSimulator)
+   - Provides pure GNN model only
 
-2. **Create new file**: `gns/simulator.py`
-   - `PhysicsSimulator` class
-   - Wraps `GraphNeuralNetworkModel`
+2. **Modify existing file**: `gns/learned_simulator.py`
+   - Keep `LearnedSimulator` class name as-is
+   - Refactor to wrap `GraphNeuralNetworkModel`
    - Responsibilities: Normalization, Euler integration, position/acceleration prediction
    - Methods: `predict_positions()`, `predict_accelerations()`, `save()`, `load()`
 
 3. **Modify existing files**: `gns/train.py`, `gns/train_multinode.py`
-   - `from gns.learned_simulator import LearnedSimulator`
-     → `from gns.simulator import PhysicsSimulator`
+   - `from gns.learned_simulator import LearnedSimulator` remains unchanged (no modification needed)
 
-**Resolves**: Issue 4 - Users wanting just the GNN can use `GraphNeuralNetworkModel`, users needing physics predictions use `PhysicsSimulator`
+**Resolves**: Issue 4 - Users wanting just the GNN can use `GraphNeuralNetworkModel`, users needing physics predictions use `LearnedSimulator`
 
 **Impact**:
 - Entire `gns/learned_simulator.py` (388 lines)
-- Import statements and `_get_simulator()` function in `gns/train.py`, `gns/train_multinode.py`
+- New file: `gns/graph_model.py`
 
 **Validation**:
 ```bash
@@ -249,12 +221,12 @@ python -m gns.train --data_path=example/WaterDropSample/ \
   --model_path=models/test/ --ntraining_steps=10 --mode=train
 
 # Verify module imports
-python -c "from gns.simulator import PhysicsSimulator; \
-from gns.learned_simulator import GraphNeuralNetworkModel; \
+python -c "from gns.learned_simulator import LearnedSimulator; \
+from gns.graph_model import GraphNeuralNetworkModel; \
 print('Import successful')"
 ```
 
-**Scope**: Large (split 388-line class, modify many import statements)
+**Scope**: Large (split 388-line class, minimal impact on existing code)
 
 ---
 
@@ -341,17 +313,17 @@ Limit `gns/` package to reusable modules only, separate execution scripts.
      - `train_step()` - Single training step
      - `validation_step()` - Single validation step
      - `save_checkpoint()`, `load_checkpoint()` - Checkpoint management
-     - `prepare_training_batch()` - Batch preparation (implemented in Step 8)
+     - `prepare_training_batch()` - Batch preparation (implemented in Step 7)
    - `gns/rollout.py` - Reusable rollout logic
      - `run_rollout()` - Rollout execution
      - `save_rollout()` - Save results
 
 3. **Move files**:
-   - `gns/train.py` → `scripts/train.py` (CLI only, logic → `gns/training.py`)
-   - `gns/train_multinode.py` → `scripts/train_multinode.py` (same)
-   - `gns/render_rollout.py` → `scripts/render_rollout.py`
+   - `gns/train.py` → `scripts/gns_train.py` (CLI only, logic → `gns/training.py`)
+   - `gns/train_multinode.py` → `scripts/gns_train_multinode.py` (same)
+   - `gns/render_rollout.py` → `scripts/gns_render_rollout.py`
 
-4. **Modify existing file**: `scripts/train.py`
+4. **Modify existing file**: `scripts/gns_train.py`
    - Keep only FLAGS parsing and CLI entry point
    - Call functions from `gns.training` for actual logic
 
@@ -365,7 +337,7 @@ Limit `gns/` package to reusable modules only, separate execution scripts.
 **Validation**:
 ```bash
 # Execute from new script location
-python scripts/train.py --data_path=example/WaterDropSample/ \
+python scripts/gns_train.py --data_path=example/WaterDropSample/ \
   --model_path=models/test/ --ntraining_steps=10 --mode=train
 
 # Verify module imports
@@ -377,96 +349,54 @@ from gns.rollout import run_rollout; print('Import successful')"
 
 ---
 
-### Step 6: Organize Root Directory Shell Scripts
+### Step 6: Archive Root Directory Shell Scripts
 
-**Purpose**: Organize shell scripts by purpose with clear naming.
+**Purpose**: Clean up root directory by archiving unnecessary shell scripts.
 
 **Changes**:
 
-1. **Create new directories**:
-   - `scripts/setup/` - For environment setup
-   - `scripts/examples/` - For execution examples
+1. **Create new directory**:
+   - `scripts/legacy/` - For archived legacy scripts
 
-2. **Move and rename files**:
+2. **Move files**:
+   - Move the following scripts to `scripts/legacy/`
    ```
-   build_venv.sh → scripts/setup/create_environment.sh
-   build_venv_frontera.sh → scripts/setup/create_environment_frontera.sh
-   module.sh → scripts/setup/load_modules.sh
-   start_venv.sh → scripts/setup/activate_environment.sh
-   run.sh → scripts/examples/train_water_drop.sh
+   build_venv.sh → scripts/legacy/build_venv.sh
+   build_venv_frontera.sh → scripts/legacy/build_venv_frontera.sh
+   module.sh → scripts/legacy/module.sh
+   start_venv.sh → scripts/legacy/start_venv.sh
+   run.sh → scripts/legacy/run.sh
    ```
 
 3. **Create new file**: `scripts/README.md`
-   - Explain purpose and usage of each script
+   - Explain new scripts (`gns_train.py`, etc.)
+   - Note that `legacy/` folder contains deprecated scripts for old environment
 
-**Resolves**: Issue 2 - Script purposes are clear and organized
+**Resolves**: Issue 2 - Root directory is clean and important files are clearly identified
 
 **Impact**:
 - 5 shell script files in root directory
 
 **Validation**:
 ```bash
-# Test environment setup script
-bash scripts/setup/create_environment.sh
-source scripts/setup/activate_environment.sh
+# Verify files were moved
+ls scripts/legacy/
 
-# Test example execution script
-bash scripts/examples/train_water_drop.sh
+# Verify root directory is clean
+ls *.sh 2>/dev/null || echo "No shell scripts in root directory (correct)"
 ```
 
 **Scope**: Small (file moves and documentation creation)
 
 ---
 
-### Phase 3: Environment & Configuration Unification (Steps 7-8)
+### Phase 3: Configuration Organization (Step 7)
 
-Unify environment definitions and organize configuration handling.
-
----
-
-### Step 7: Unify Environment Definition Files
-
-**Purpose**: Centralize dependency definitions to eliminate inconsistencies.
-
-**Changes**:
-
-1. **Modify existing file**: `environment.yml`
-   - Fix filename typo (`enviornment.yml` → `environment.yml`)
-   - Add comment at top: "Use requirements.txt as the source of truth"
-
-2. **Maintain existing file**: `requirements.txt`
-   - Maintain as single source of truth for dependencies
-   - Already used by CI (`.circleci/config.yml`)
-
-3. **Create new file**: `scripts/setup/create_conda_environment.sh`
-   - Script to create conda environment using `requirements.txt`
-
-4. **Update documentation**: `README.md` (if exists)
-   - Specify which environment definition file to use
-
-**Resolves**: Issue 1 - Environment definition unification
-
-**Impact**:
-- `environment.yml` (typo fix and comment addition)
-- New script in `scripts/setup/`
-
-**Validation**:
-```bash
-# Test pip installation
-pip install -r requirements.txt
-python -c "import torch; import torch_geometric; print('OK')"
-
-# Test conda environment creation
-bash scripts/setup/create_conda_environment.sh
-conda activate gns
-python -c "import torch; import torch_geometric; print('OK')"
-```
-
-**Scope**: Small (mainly documentation and script addition)
+Organize training batch preparation processing.
 
 ---
 
-### Step 8: Functionalize Training Loop Feature Extraction
+### Step 7: Functionalize Training Loop Feature Extraction
 
 **Purpose**: Make training batch preparation logic reusable.
 
@@ -480,7 +410,7 @@ python -c "import torch; import torch_geometric; print('OK')"
      - Kinematic particle masking
    - Extract inline processing currently in `train.py` lines 387-419
 
-2. **Modify existing files**: `scripts/train.py`, `scripts/train_multinode.py`
+2. **Modify existing files**: `scripts/gns_train.py`, `scripts/gns_train_multinode.py`
    - Call `prepare_training_batch()` in training loop
 
 **Resolves**: Issue 4 - Training batch preparation logic is reusable
@@ -516,16 +446,15 @@ Phase 2: Module/Script Clarification
     ↓
   Step 6 (shell script organization) - After Step 0 (can run parallel to Step 5)
 
-Phase 3: Environment & Configuration Unification (mostly done in Step 0)
-  Step 7 (environment unification) - Most work done in Step 0, remaining tasks only
-    ↓
-  Step 8 (batch prep functionalization) - Depends on Step 5
+Phase 3: Configuration Organization
+  Step 7 (batch prep functionalization) - Depends on Step 5
 ```
 
 **Important**: Step 0 (uv environment setup) must be done first. This enables:
 - pyright-lsp works properly during refactoring
 - Type checking and code completion available
 - Validation with latest packages possible
+- Issue 1 (environment definition unification) completely resolved
 
 ## Final Directory Structure
 
@@ -534,9 +463,9 @@ Phase 3: Environment & Configuration Unification (mostly done in Step 0)
 ├── gns/                          # Reusable modules only
 │   ├── config.py                 # NEW - Step 3
 │   ├── inference_utils.py        # NEW - Step 1
-│   ├── simulator.py              # NEW - Step 2
+│   ├── graph_model.py            # NEW - Step 2
 │   ├── learned_simulator.py      # MODIFIED - Step 2
-│   ├── training.py               # NEW - Step 5, 8
+│   ├── training.py               # NEW - Step 5, 7
 │   ├── rollout.py                # NEW - Step 5
 │   ├── graph_network.py          # Existing (no changes)
 │   ├── data_loader.py            # Existing (no changes)
@@ -544,25 +473,19 @@ Phase 3: Environment & Configuration Unification (mostly done in Step 0)
 │   └── noise_utils.py            # Existing (no changes)
 │
 ├── scripts/                      # Execution scripts
-│   ├── train.py                  # MOVED - Step 5
-│   ├── train_multinode.py        # MOVED - Step 5
-│   ├── render_rollout.py         # MOVED - Step 5
-│   ├── setup/                    # NEW - Step 0, 6
-│   │   ├── setup_uv_environment.sh      # NEW - Step 0
-│   │   ├── create_environment.sh        # MOVED - Step 6
-│   │   ├── create_environment_frontera.sh # MOVED - Step 6
-│   │   ├── load_modules.sh             # MOVED - Step 6
-│   │   └── activate_environment.sh     # MOVED - Step 6
-│   ├── examples/                 # NEW - Step 6
-│   │   └── train_water_drop.sh
-│   └── README.md                 # NEW - Step 6
+│   ├── gns_train.py              # MOVED - Step 5
+│   ├── gns_train_multinode.py    # MOVED - Step 5
+│   ├── gns_render_rollout.py     # MOVED - Step 5
+│   ├── README.md                 # NEW - Step 6
+│   └── legacy/                   # MOVED - Step 6
+│       ├── build_venv.sh
+│       ├── build_venv_frontera.sh
+│       ├── module.sh
+│       ├── start_venv.sh
+│       └── run.sh
 │
 ├── pyproject.toml                # NEW - Step 0 (source of truth for dependencies)
 ├── .python-version               # NEW - Step 0
-├── .venv/                        # NEW - Step 0 (add to gitignore)
-├── uv.lock                       # NEW - Step 0 (add to gitignore)
-├── requirements.txt              # DEPRECATED - Step 0 (kept for compatibility)
-├── enviornment.yml               # DEPRECATED - Step 0 (kept for compatibility)
 ├── slurm_scripts/                # Existing (no changes)
 ├── test/                         # Existing (no changes)
 └── ...
@@ -574,30 +497,26 @@ Phase 3: Environment & Configuration Unification (mostly done in Step 0)
 
 1. **gns/train.py** (658 lines)
    - Changed incrementally in Steps 1, 3, 4, 5
-   - Finally moved to `scripts/train.py`
+   - Finally moved to `scripts/gns_train.py`
 
 2. **gns/learned_simulator.py** (388 lines)
-   - Renamed and split to `GraphNeuralNetworkModel` in Step 2
+   - Refactored internally in Step 2 to wrap `GraphNeuralNetworkModel`
 
 3. **gns/train_multinode.py** (~25KB)
    - Requires same changes as `gns/train.py`
-   - Finally moved to `scripts/train_multinode.py`
+   - Finally moved to `scripts/gns_train_multinode.py`
 
-4. **requirements.txt**
-   - Positioned as source of truth for dependencies in Step 7
-
-5. **gns/reading_utils.py**
+4. **gns/reading_utils.py**
    - Used by `config.py` in Steps 3, 4 (no changes needed)
 
 ### New Files to Create
 
 1. **gns/inference_utils.py** - Step 1
-2. **gns/simulator.py** - Step 2
+2. **gns/graph_model.py** - Step 2
 3. **gns/config.py** - Step 3
 4. **gns/training.py** - Step 5
 5. **gns/rollout.py** - Step 5
 6. **scripts/README.md** - Step 6
-7. **scripts/setup/create_conda_environment.sh** - Step 7
 
 ## Validation Strategy
 
@@ -605,13 +524,13 @@ After each step completion:
 
 1. **Run small-scale training** (10 steps)
    ```bash
-   python scripts/train.py --data_path=example/WaterDropSample/ \
+   python scripts/gns_train.py --data_path=example/WaterDropSample/ \
      --model_path=models/test/ --ntraining_steps=10 --mode=train
    ```
 
 2. **Run rollout**
    ```bash
-   python scripts/train.py --data_path=example/WaterDropSample/ \
+   python scripts/gns_train.py --data_path=example/WaterDropSample/ \
      --model_path=models/test/ --model_file=model-10.pt \
      --mode=rollout --output_path=rollouts/test/
    ```
@@ -638,7 +557,7 @@ After each step completion:
 
 ### Issue 2: Compatibility with Existing SLURM Scripts
 
-**Mitigation**: Don't change `slurm_scripts/`, maintain same interface in `scripts/train.py` as original `gns/train.py`
+**Mitigation**: Don't change `slurm_scripts/`, maintain same interface in `scripts/gns_train.py` as original `gns/train.py`
 
 ### Issue 3: Insufficient Test Code
 
@@ -646,19 +565,20 @@ After each step completion:
 
 ## Completion Criteria
 
-After completing all 9 steps, the following should be achieved:
+After completing all 7 steps, the following should be achieved:
 
 1. ✅ **Environment definitions unified in `pyproject.toml`** (Step 0)
    - Latest Python 3.13 environment managed by uv
    - pyright-lsp works properly, type checking and code completion available
 
-2. ✅ **Shell scripts organized in `scripts/setup/`, `scripts/examples/`** (Step 6)
-   - Organized by purpose with clear naming
+2. ✅ **Shell scripts archived in `scripts/legacy/`** (Step 6)
+   - Old scripts moved to legacy folder
+   - Clear documentation in scripts/README.md
 
 3. ✅ **`gns/` package contains reusable modules only** (Step 5)
    - Execution scripts moved to `scripts/`
 
-4. ✅ **Inference, kinematic constraints, training batch prep extractable as independent functions** (Steps 1, 8)
+4. ✅ **Inference, kinematic constraints, training batch prep extractable as independent functions** (Steps 1, 7)
    - `inference_utils.py` provides inference logic
    - `training.py` provides training logic
 
@@ -668,7 +588,7 @@ After completing all 9 steps, the following should be achieved:
 At this state, users can:
 - ✅ Import and use only needed features
 - ✅ Clearly distinguish modules from scripts
-- ✅ Follow clear environment setup procedure (`bash scripts/setup/setup_uv_environment.sh` completes it)
+- ✅ Follow clear environment setup procedure (`uv sync` completes it)
 - ✅ Understand script purposes clearly
 - ✅ Benefit from latest Python ecosystem (Python 3.13, PyTorch 2.6+, numpy 2.1+)
 - ✅ Work efficiently with type checking and completion during refactoring

@@ -497,10 +497,10 @@ Phase 3: 設定の整理
 
 1. **gns/train.py** (658行)
    - Steps 1, 3, 4, 5で段階的に変更
-   - 最終的に `scripts/train.py` に移動
+   - 最終的に `scripts/gns_train.py` に移動
 
 2. **gns/learned_simulator.py** (388行)
-   - Step 2で `GraphNeuralNetworkModel` にリネーム・分割
+   - Step 2で内部をリファクタリング（`GraphNeuralNetworkModel`をラップ）
 
 3. **gns/train_multinode.py** (~25KB)
    - `gns/train.py` と同様の変更が必要

@@ -19,6 +19,7 @@ from gns import learned_simulator
 from gns import noise_utils
 from gns import reading_utils
 from gns import data_loader
+from gns import inference_utils
 import torch
 import torch.distributed as dist
 import torchvision.models as models
@@ -82,49 +83,17 @@ def rollout(
     device: torch device.
   """
 
-  initial_positions = position[:, :INPUT_SEQUENCE_LENGTH]
-  ground_truth_positions = position[:, INPUT_SEQUENCE_LENGTH:]
-
-  current_positions = initial_positions
-  predictions = []
-
-  for step in tqdm(range(nsteps), total=nsteps):
-    # Get next position with shape (nnodes, dim)
-    next_position = simulator.predict_positions(
-        current_positions,
-        nparticles_per_example=[n_particles_per_example],
-        particle_types=particle_types,
-        material_property=material_property
-    )
-
-    # Update kinematic particles from prescribed trajectory.
-    kinematic_mask = (particle_types == KINEMATIC_PARTICLE_ID).clone().detach().to(device)
-    next_position_ground_truth = ground_truth_positions[:, step]
-    kinematic_mask = kinematic_mask.bool()[:, None].expand(-1, current_positions.shape[-1])
-    next_position = torch.where(
-        kinematic_mask, next_position_ground_truth, next_position)
-    predictions.append(next_position)
-
-    # Shift `current_positions`, removing the oldest position in the sequence
-    # and appending the next position at the end.
-    current_positions = torch.cat(
-        [current_positions[:, 1:], next_position[:, None, :]], dim=1)
-
-  # Predictions with shape (time, nnodes, dim)
-  predictions = torch.stack(predictions)
-  ground_truth_positions = ground_truth_positions.permute(1, 0, 2)
-
-  loss = (predictions - ground_truth_positions) ** 2
-
-  output_dict = {
-      'initial_positions': initial_positions.permute(1, 0, 2).cpu().numpy(),
-      'predicted_rollout': predictions.cpu().numpy(),
-      'ground_truth_rollout': ground_truth_positions.cpu().numpy(),
-      'particle_types': particle_types.cpu().numpy(),
-      'material_property': material_property.cpu().numpy() if material_property is not None else None
-  }
-
-  return output_dict, loss
+  return inference_utils.rollout(
+      simulator=simulator,
+      position=position,
+      particle_types=particle_types,
+      material_property=material_property,
+      n_particles_per_example=n_particles_per_example,
+      nsteps=nsteps,
+      input_sequence_length=INPUT_SEQUENCE_LENGTH,
+      kinematic_particle_id=KINEMATIC_PARTICLE_ID,
+      device=device
+  )
 
 
 def rollout_par(

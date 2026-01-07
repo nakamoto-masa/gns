@@ -5,11 +5,11 @@
 ## 進捗状況
 
 - [x] Phase 0: 環境構築 (4/4) ✅
-- [ ] Phase 1: アーキテクチャ分離 (0/13)
+- [ ] Phase 1: アーキテクチャ分離 (3/13)
 - [ ] Phase 2: モジュール/スクリプト明確化 (0/9)
 - [ ] Phase 3: 設定の整理 (0/3)
 
-**全体進捗: 4/29 タスク完了**
+**全体進捗: 7/29 タスク完了**
 
 ---
 
@@ -64,37 +64,40 @@ uv run python -m gns.train --data_path=example/WaterDropSample/ \
 
 ## Phase 1: アーキテクチャ分離
 
-### Step 1.1: gns/inference_utils.py の作成（run_inference_loop と apply_kinematic_constraints）
-- [ ] `gns/inference_utils.py` の作成
-- [ ] `run_inference_loop()` 関数の実装
-- [ ] `apply_kinematic_constraints()` 関数の実装
+### Step 1.1: gns/inference_utils.py の作成（run_inference_loop と apply_kinematic_constraints） ✅
+- [x] `gns/inference_utils.py` の作成
+- [x] `run_inference_loop()` 関数の実装
+- [x] `apply_kinematic_constraints()` 関数の実装
 
 **成果物:**
-- `gns/inference_utils.py`
+- `gns/inference_utils.py` - 推論ループと運動学的制約の適用を分離
+  - `apply_kinematic_constraints()` - 運動学的粒子の制約適用
+  - `run_inference_loop()` - シミュレータによる推論ループ
+  - `rollout()` - 既存インターフェース互換のrollout関数
 
-### Step 1.2: gns/train.py と train_multinode.py の rollout() 関数を分離した関数呼び出しに修正
-- [ ] `gns/train.py` の `rollout()` 関数を修正
-- [ ] `gns/train_multinode.py` の `rollout()` 関数を修正
+### Step 1.2: gns/train.py と train_multinode.py の rollout() 関数を分離した関数呼び出しに修正 ✅
+- [x] `gns/train.py` の `rollout()` 関数を修正
+- [x] `gns/train_multinode.py` の `rollout()` 関数を修正
 
 **影響範囲:**
-- `gns/train.py` の `rollout()` 関数（56-119行）
-- `gns/train_multinode.py` の同等部分
+- `gns/train.py` の `rollout()` 関数（56-119行 → 78-88行に短縮）
+- `gns/train_multinode.py` の同等部分（86-96行に短縮）
 
-### Step 1.3: 学習とrolloutの実行で検証
-- [ ] 10ステップの学習実行
-- [ ] rolloutの実行
-- [ ] 出力ファイルの確認
+### Step 1.3: 学習とrolloutの実行で検証 ✅
+- [x] 10ステップの学習実行 - 成功（loss: 2.28 → 1.85）
+- [x] rolloutの実行 - 成功（平均loss: 0.211）
+- [x] 出力ファイルの確認 - rollout_ex0.pkl, rollout_ex1.pkl生成確認
 
 **検証コマンド:**
 ```bash
-python -m gns.train --data_path=example/WaterDropSample/ \
-  --model_path=models/test/ --ntraining_steps=10 --mode=train
+uv run python -m gns.train --data_path=example/WaterDropSample/ \
+  --model_path=models/test_step1/ --ntraining_steps=10 --mode=train
 
-python -m gns.train --data_path=example/WaterDropSample/ \
-  --model_path=models/test/ --model_file=model-10.pt \
-  --mode=rollout --output_path=rollouts/test/
+uv run python -m gns.train --data_path=example/WaterDropSample/ \
+  --model_path=models/test_step1/ --model_file=model-10.pt \
+  --mode=rollout --output_path=rollouts/test_step1/
 
-ls rollouts/test/
+ls rollouts/test_step1/
 ```
 
 ### Step 2.1: gns/graph_model.py の作成（GraphNeuralNetworkModel クラス）

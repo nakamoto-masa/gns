@@ -52,18 +52,22 @@
    - パッケージバージョンを最新の安定版に更新
 
    主要な依存関係:
-   - Python 3.12 (最新安定版、3.9からアップグレード)
-   - PyTorch 2.x (最新安定版、1.12からアップグレード)
-   - torch-geometric (PyTorch 2.x 対応版)
-   - numpy (バージョン固定を削除し最新へ)
+   - Python 3.13 (最新安定版、3.9からアップグレード)
+     - 根拠: 2024年10月リリース、主要ライブラリが対応済み
+   - PyTorch 2.6+ (最新安定版、1.12からアップグレード)
+     - PyTorch 2.6から Python 3.13 をサポート
+   - torch-geometric 2.6+ (PyTorch 2.6+ 対応版)
+     - Python 3.10-3.13 をサポート
+   - numpy 2.1+ (バージョン固定を削除し最新へ)
+     - numpy 2.1.0+ で Python 3.13 をサポート
    - その他: absl-py, matplotlib, pytest, tqdm など
 
 2. **新規ファイル作成**: `.python-version`
-   - uv で使用する Python バージョンを指定（3.12）
+   - uv で使用する Python バージョンを指定（3.13）
 
 3. **新規スクリプト作成**: `scripts/setup/setup_uv_environment.sh`
    - uv のインストール
-   - Python 3.12 環境の作成
+   - Python 3.13 環境の作成
    - 依存関係のインストール
    - 実行例:
      ```bash
@@ -73,8 +77,8 @@
          curl -LsSf https://astral.sh/uv/install.sh | sh
      fi
 
-     # Create virtual environment with Python 3.12
-     uv venv --python 3.12
+     # Create virtual environment with Python 3.13
+     uv venv --python 3.13
 
      # Activate and install dependencies
      source .venv/bin/activate
@@ -128,11 +132,11 @@ python -m gns.train --data_path=example/WaterDropSample/ \
 name = "gns"
 version = "0.1.0"
 description = "Graph Network-based Simulator"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
-    "torch>=2.4.0",
-    "torch-geometric>=2.5.0",
-    "numpy>=2.0.0",
+    "torch>=2.6.0",
+    "torch-geometric>=2.6.0",
+    "numpy>=2.1.0",
     "absl-py>=2.0.0",
     "matplotlib>=3.9.0",
     "pyevtk>=1.6.0",
@@ -160,6 +164,7 @@ packages = ["gns"]
 - PyTorch 2.x では API に破壊的変更がある可能性があるため、動作確認が重要
 - torch-geometric も PyTorch のバージョンに依存するため、互換性を確認
 - numpy 2.x は一部の API が変更されているため、必要に応じてコード修正
+- Python 3.13 は JIT コンパイラが導入され、パフォーマンス向上が期待できる
 
 ---
 
@@ -644,7 +649,7 @@ Phase 3: 環境・設定統一（Step 0で先行実施済み）
 全9ステップ完了後、以下が達成されていること:
 
 1. ✅ **環境定義が `pyproject.toml` に一元化**（Step 0）
-   - uv で管理される最新の Python 3.12 環境
+   - uv で管理される最新の Python 3.13 環境
    - pyright-lsp が正常動作し、型チェック・コード補完が利用可能
 
 2. ✅ **シェルスクリプトが `scripts/setup/`, `scripts/examples/` に整理**（Step 6）
@@ -665,7 +670,8 @@ Phase 3: 環境・設定統一（Step 0で先行実施済み）
 - ✅ モジュールとスクリプトの区別が明確
 - ✅ 環境構築の手順が明確（`bash scripts/setup/setup_uv_environment.sh` で完結）
 - ✅ スクリプトの目的が明確
-- ✅ 最新の Python エコシステムの恩恵を受けられる（Python 3.12, PyTorch 2.x, numpy 2.x）
+- ✅ 最新の Python エコシステムの恩恵を受けられる（Python 3.13, PyTorch 2.6+, numpy 2.1+）
 - ✅ リファクタリング中も型チェック・補完が機能し、効率的に作業できる
+- ✅ Python 3.13 の JIT コンパイラによるパフォーマンス向上の恩恵を受けられる
 
 を実現できる。

@@ -52,18 +52,22 @@ Set up a modern Python environment first to enable efficient refactoring work.
    - Update package versions to latest stable releases
 
    Key dependencies:
-   - Python 3.12 (latest stable, upgrade from 3.9)
-   - PyTorch 2.x (latest stable, upgrade from 1.12)
-   - torch-geometric (PyTorch 2.x compatible version)
-   - numpy (remove version pinning, upgrade to latest)
+   - Python 3.13 (latest stable, upgrade from 3.9)
+     - Rationale: Released October 2024, all major libraries now support it
+   - PyTorch 2.6+ (latest stable, upgrade from 1.12)
+     - PyTorch 2.6 introduced Python 3.13 support
+   - torch-geometric 2.6+ (PyTorch 2.6+ compatible version)
+     - Supports Python 3.10-3.13
+   - numpy 2.1+ (remove version pinning, upgrade to latest)
+     - numpy 2.1.0+ supports Python 3.13
    - Others: absl-py, matplotlib, pytest, tqdm, etc.
 
 2. **Create new file**: `.python-version`
-   - Specify Python version for uv (3.12)
+   - Specify Python version for uv (3.13)
 
 3. **Create new script**: `scripts/setup/setup_uv_environment.sh`
    - Install uv
-   - Create Python 3.12 environment
+   - Create Python 3.13 environment
    - Install dependencies
    - Example:
      ```bash
@@ -73,8 +77,8 @@ Set up a modern Python environment first to enable efficient refactoring work.
          curl -LsSf https://astral.sh/uv/install.sh | sh
      fi
 
-     # Create virtual environment with Python 3.12
-     uv venv --python 3.12
+     # Create virtual environment with Python 3.13
+     uv venv --python 3.13
 
      # Activate and install dependencies
      source .venv/bin/activate
@@ -128,11 +132,11 @@ python -m gns.train --data_path=example/WaterDropSample/ \
 name = "gns"
 version = "0.1.0"
 description = "Graph Network-based Simulator"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
-    "torch>=2.4.0",
-    "torch-geometric>=2.5.0",
-    "numpy>=2.0.0",
+    "torch>=2.6.0",
+    "torch-geometric>=2.6.0",
+    "numpy>=2.1.0",
     "absl-py>=2.0.0",
     "matplotlib>=3.9.0",
     "pyevtk>=1.6.0",
@@ -160,6 +164,7 @@ packages = ["gns"]
 - PyTorch 2.x may have breaking API changes, so validation is critical
 - torch-geometric version depends on PyTorch version, verify compatibility
 - numpy 2.x has some API changes, modify code if necessary
+- Python 3.13 introduces JIT compiler, offering potential performance improvements
 
 ---
 
@@ -644,7 +649,7 @@ After each step completion:
 After completing all 9 steps, the following should be achieved:
 
 1. ✅ **Environment definitions unified in `pyproject.toml`** (Step 0)
-   - Latest Python 3.12 environment managed by uv
+   - Latest Python 3.13 environment managed by uv
    - pyright-lsp works properly, type checking and code completion available
 
 2. ✅ **Shell scripts organized in `scripts/setup/`, `scripts/examples/`** (Step 6)
@@ -665,5 +670,6 @@ At this state, users can:
 - ✅ Clearly distinguish modules from scripts
 - ✅ Follow clear environment setup procedure (`bash scripts/setup/setup_uv_environment.sh` completes it)
 - ✅ Understand script purposes clearly
-- ✅ Benefit from latest Python ecosystem (Python 3.12, PyTorch 2.x, numpy 2.x)
+- ✅ Benefit from latest Python ecosystem (Python 3.13, PyTorch 2.6+, numpy 2.1+)
 - ✅ Work efficiently with type checking and completion during refactoring
+- ✅ Leverage Python 3.13's JIT compiler for performance improvements

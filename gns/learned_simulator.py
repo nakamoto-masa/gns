@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import numpy as np
 from gns.graph_model import GraphNeuralNetworkModel
-from typing import Dict
 
 
 class LearnedSimulator(nn.Module):
@@ -29,7 +28,7 @@ class LearnedSimulator(nn.Module):
           nparticle_types: int,
           particle_type_embedding_size: int,
           boundary_clamp_limit: float = 1.0,
-          device="cpu"
+          device: str = "cpu"
   ):
     """Initializes the model.
 
@@ -101,7 +100,7 @@ class LearnedSimulator(nn.Module):
           position_sequence: torch.Tensor,
           nparticles_per_example: torch.Tensor,
           particle_types: torch.Tensor,
-          material_property: torch.Tensor = None):
+          material_property: torch.Tensor | None = None):
     """Extracts important features from the position sequence.
 
     Args:
@@ -163,7 +162,7 @@ class LearnedSimulator(nn.Module):
           current_positions: torch.Tensor,
           nparticles_per_example: torch.Tensor,
           particle_types: torch.Tensor,
-          material_property: torch.Tensor = None) -> torch.Tensor:
+          material_property: torch.Tensor | None = None) -> torch.Tensor:
     """Predict position based on acceleration.
 
     Args:
@@ -191,7 +190,7 @@ class LearnedSimulator(nn.Module):
           position_sequence: torch.Tensor,
           nparticles_per_example: torch.Tensor,
           particle_types: torch.Tensor,
-          material_property: torch.Tensor = None):
+          material_property: torch.Tensor | None = None):
     """Produces normalized and predicted acceleration targets.
 
     Args:

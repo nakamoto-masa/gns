@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 from gns import graph_network
 from torch_geometric.nn import radius_graph
 
@@ -23,7 +24,7 @@ class GraphNeuralNetworkModel(nn.Module):
           connectivity_radius: float,
           nparticle_types: int,
           particle_type_embedding_size: int,
-          boundaries: torch.Tensor,
+          boundaries: np.ndarray,
           boundary_clamp_limit: float = 1.0,
           device: str = "cpu"
   ):
@@ -108,7 +109,7 @@ class GraphNeuralNetworkModel(nn.Module):
           nparticles_per_example: torch.Tensor,
           particle_types: torch.Tensor,
           normalized_velocity_sequence: torch.Tensor,
-          material_property: torch.Tensor = None):
+          material_property: torch.Tensor | None = None):
     """Build node and edge features for the graph network.
 
     Args:

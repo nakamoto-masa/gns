@@ -79,23 +79,21 @@ Set up a modern Python environment first to enable efficient refactoring work.
 
 **Validation**:
 ```bash
-# Setup uv environment
-uv venv --python 3.13
-source .venv/bin/activate
-uv pip install -e .
+# Setup uv environment (uv sync automatically creates venv and installs dependencies)
+uv sync
 
 # Check dependencies
 uv pip list
 
 # Quick functionality test
-python -c "import torch; import torch_geometric; print(f'PyTorch: {torch.__version__}'); print('OK')"
+uv run python -c "import torch; import torch_geometric; print(f'PyTorch: {torch.__version__}'); print('OK')"
 
 # Verify existing tests pass
-pytest test/test_pytorch.py
-pytest test/test_torch_geometric.py
+uv run pytest test/test_pytorch.py
+uv run pytest test/test_torch_geometric.py
 
 # Run small-scale training (same command used in Step 1 onwards)
-python -m gns.train --data_path=example/WaterDropSample/ \
+uv run python -m gns.train --data_path=example/WaterDropSample/ \
   --model_path=models/test/ --ntraining_steps=10 --mode=train
 ```
 
@@ -117,18 +115,10 @@ dependencies = [
     "tqdm>=4.66.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=8.0.0",
-    "autopep8>=2.0.0",
 ]
-
-[build-system]
-requires = ["setuptools>=70.0.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-packages = ["gns"]
 ```
 
 **Scope**: Small (environment setup only, no code changes)

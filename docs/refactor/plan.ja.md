@@ -79,23 +79,21 @@
 
 **検証方法**:
 ```bash
-# uv 環境のセットアップ
-uv venv --python 3.13
-source .venv/bin/activate
-uv pip install -e .
+# uv 環境のセットアップ（uv sync で自動的に venv 作成と依存関係インストール）
+uv sync
 
 # 依存関係の確認
 uv pip list
 
 # 簡単な動作確認
-python -c "import torch; import torch_geometric; print(f'PyTorch: {torch.__version__}'); print('OK')"
+uv run python -c "import torch; import torch_geometric; print(f'PyTorch: {torch.__version__}'); print('OK')"
 
 # 既存のテストが通ることを確認
-pytest test/test_pytorch.py
-pytest test/test_torch_geometric.py
+uv run pytest test/test_pytorch.py
+uv run pytest test/test_torch_geometric.py
 
 # 小規模学習の実行（Step 1以降で使用するコマンドと同じ）
-python -m gns.train --data_path=example/WaterDropSample/ \
+uv run python -m gns.train --data_path=example/WaterDropSample/ \
   --model_path=models/test/ --ntraining_steps=10 --mode=train
 ```
 
@@ -117,18 +115,10 @@ dependencies = [
     "tqdm>=4.66.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=8.0.0",
-    "autopep8>=2.0.0",
 ]
-
-[build-system]
-requires = ["setuptools>=70.0.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-packages = ["gns"]
 ```
 
 **規模**: 小（環境構築のみ、コードは変更なし）
@@ -588,7 +578,7 @@ Phase 3: 設定の整理
 この状態で、ユーザーは:
 - ✅ 必要な機能だけをインポートして使える
 - ✅ モジュールとスクリプトの区別が明確
-- ✅ 環境構築の手順が明確（`uv venv --python 3.13 && uv pip install -e .` で完結）
+- ✅ 環境構築の手順が明確（`uv sync` で完結）
 - ✅ ルートディレクトリがクリーンで、重要なファイルが見つけやすい
 - ✅ 最新の Python エコシステムの恩恵を受けられる（Python 3.13, PyTorch 2.6+, numpy 2.1+）
 - ✅ リファクタリング中も型チェック・補完が機能し、効率的に作業できる

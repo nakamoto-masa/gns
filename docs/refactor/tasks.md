@@ -23,36 +23,33 @@
 - `pyproject.toml`
 - `.python-version`
 
-### Step 0.2: requirements.txt と environment.yml の削除
+### Step 0.2: requirements.txt と enviornment.yml の削除
 - [ ] `requirements.txt` の削除
-- [ ] `environment.yml` の削除
+- [ ] `enviornment.yml` の削除（typo版のファイル名）
 
 **成果物:**
 - 旧ファイルの削除
 
 ### Step 0.3: uv 環境のセットアップと依存関係インストール
-- [ ] `uv venv --python 3.13` の実行
-- [ ] `uv pip install -e .` の実行
+- [ ] `uv sync` の実行（自動的に venv 作成と依存関係インストール）
 - [ ] 依存関係のバージョン確認
 
 **検証コマンド:**
 ```bash
-uv venv --python 3.13
-source .venv/bin/activate
-uv pip install -e .
+uv sync
 uv pip list
-python -c "import torch; import torch_geometric; print(f'PyTorch: {torch.__version__}'); print('OK')"
+uv run python -c "import torch; import torch_geometric; print(f'PyTorch: {torch.__version__}'); print('OK')"
 ```
 
 ### Step 0.4: 既存テストと小規模学習の実行で動作検証
-- [ ] 既存テストの実行（`pytest test/test_pytorch.py`, `pytest test/test_torch_geometric.py`）
+- [ ] 既存テストの実行（`uv run pytest test/test_pytorch.py`, `uv run pytest test/test_torch_geometric.py`）
 - [ ] 小規模学習の実行（10ステップ）
 
 **検証コマンド:**
 ```bash
-pytest test/test_pytorch.py
-pytest test/test_torch_geometric.py
-python -m gns.train --data_path=example/WaterDropSample/ \
+uv run pytest test/test_pytorch.py
+uv run pytest test/test_torch_geometric.py
+uv run python -m gns.train --data_path=example/WaterDropSample/ \
   --model_path=models/test/ --ntraining_steps=10 --mode=train
 ```
 

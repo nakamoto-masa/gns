@@ -349,41 +349,41 @@ from gns.rollout import run_rollout; print('Import successful')"
 
 ---
 
-### Step 6: ルートディレクトリのシェルスクリプト整理
+### Step 6: ルートディレクトリのシェルスクリプト退避
 
-**目的**: シェルスクリプトを目的別に整理し、わかりやすい名前を付ける。
+**目的**: 不要なシェルスクリプトをルートディレクトリから整理する。
 
 **変更内容**:
 
 1. **新規ディレクトリ作成**:
-   - `scripts/setup/` - 環境構築用
-   - `scripts/examples/` - 実行例
+   - `scripts/legacy/` - 旧スクリプト退避用
 
-2. **ファイル移動とリネーム**:
+2. **ファイル移動**:
+   - 以下のスクリプトを `scripts/legacy/` に移動
    ```
-   build_venv.sh → scripts/setup/create_environment.sh
-   build_venv_frontera.sh → scripts/setup/create_environment_frontera.sh
-   module.sh → scripts/setup/load_modules.sh
-   start_venv.sh → scripts/setup/activate_environment.sh
-   run.sh → scripts/examples/train_water_drop.sh
+   build_venv.sh → scripts/legacy/build_venv.sh
+   build_venv_frontera.sh → scripts/legacy/build_venv_frontera.sh
+   module.sh → scripts/legacy/module.sh
+   start_venv.sh → scripts/legacy/start_venv.sh
+   run.sh → scripts/legacy/run.sh
    ```
 
 3. **新規ファイル作成**: `scripts/README.md`
-   - 各スクリプトの目的と使い方を説明
+   - 新しいスクリプト（`gns_train.py` など）の説明
+   - `legacy/` フォルダには古い環境用スクリプトがあり、使用非推奨であることを明記
 
-**解決する課題**: 課題2 - スクリプトの目的が明確になり、整理される
+**解決する課題**: 課題2 - ルートディレクトリがクリーンになり、どのファイルが重要かが明確になる
 
 **影響範囲**:
 - ルートディレクトリのシェルスクリプト5ファイル
 
 **検証方法**:
 ```bash
-# 環境構築スクリプトのテスト
-bash scripts/setup/create_environment.sh
-source scripts/setup/activate_environment.sh
+# ファイルが移動されたことを確認
+ls scripts/legacy/
 
-# サンプル実行スクリプトのテスト
-bash scripts/examples/train_water_drop.sh
+# ルートディレクトリがクリーンであることを確認
+ls *.sh 2>/dev/null || echo "ルートディレクトリにシェルスクリプトなし（正常）"
 ```
 
 **規模**: 小（ファイル移動とドキュメント作成）
@@ -476,14 +476,13 @@ Phase 3: 設定の整理
 │   ├── gns_train.py              # MOVED - Step 5
 │   ├── gns_train_multinode.py    # MOVED - Step 5
 │   ├── gns_render_rollout.py     # MOVED - Step 5
-│   ├── setup/                    # NEW - Step 6
-│   │   ├── create_environment.sh        # MOVED - Step 6
-│   │   ├── create_environment_frontera.sh # MOVED - Step 6
-│   │   ├── load_modules.sh             # MOVED - Step 6
-│   │   └── activate_environment.sh     # MOVED - Step 6
-│   ├── examples/                 # NEW - Step 6
-│   │   └── train_water_drop.sh
-│   └── README.md                 # NEW - Step 6
+│   ├── README.md                 # NEW - Step 6（スクリプトの説明）
+│   └── legacy/                   # MOVED - Step 6（旧スクリプト退避）
+│       ├── build_venv.sh
+│       ├── build_venv_frontera.sh
+│       ├── module.sh
+│       ├── start_venv.sh
+│       └── run.sh
 │
 ├── pyproject.toml                # NEW - Step 0（依存関係の唯一の情報源）
 ├── .python-version               # NEW - Step 0
@@ -573,8 +572,8 @@ Phase 3: 設定の整理
    - pyright-lsp が正常動作し、型チェック・コード補完が利用可能
    - 旧環境定義ファイル（`requirements.txt`, `enviornment.yml`）を削除
 
-2. ✅ **シェルスクリプトが `scripts/setup/`, `scripts/examples/` に整理**（Step 6）
-   - 目的別に整理され、わかりやすい命名
+2. ✅ **不要なシェルスクリプトが `scripts/legacy/` に退避**（Step 6）
+   - ルートディレクトリがクリーンになり、重要なファイルが明確
 
 3. ✅ **`gns/` パッケージが再利用可能なモジュールのみを含む**（Step 5）
    - 実行スクリプトは `scripts/` に移動（`gns_train.py` など）
@@ -590,7 +589,7 @@ Phase 3: 設定の整理
 - ✅ 必要な機能だけをインポートして使える
 - ✅ モジュールとスクリプトの区別が明確
 - ✅ 環境構築の手順が明確（`uv venv --python 3.13 && uv pip install -e .` で完結）
-- ✅ スクリプトの目的が明確
+- ✅ ルートディレクトリがクリーンで、重要なファイルが見つけやすい
 - ✅ 最新の Python エコシステムの恩恵を受けられる（Python 3.13, PyTorch 2.6+, numpy 2.1+）
 - ✅ リファクタリング中も型チェック・補完が機能し、効率的に作業できる
 - ✅ Python 3.13 の JIT コンパイラによるパフォーマンス向上の恩恵を受けられる

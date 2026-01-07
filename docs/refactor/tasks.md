@@ -4,35 +4,41 @@
 
 ## 進捗状況
 
-- [ ] Phase 0: 環境構築 (0/4)
+- [x] Phase 0: 環境構築 (4/4) ✅
 - [ ] Phase 1: アーキテクチャ分離 (0/13)
 - [ ] Phase 2: モジュール/スクリプト明確化 (0/9)
 - [ ] Phase 3: 設定の整理 (0/3)
 
-**全体進捗: 0/27 タスク完了**
+**全体進捗: 4/29 タスク完了**
 
 ---
 
-## Phase 0: 環境構築
+## Phase 0: 環境構築 ✅
 
-### Step 0.1: pyproject.toml と .python-version の作成
-- [ ] `pyproject.toml` の作成（依存関係定義）
-- [ ] `.python-version` の作成（Python 3.13 指定）
-
-**成果物:**
-- `pyproject.toml`
-- `.python-version`
-
-### Step 0.2: requirements.txt と enviornment.yml の削除
-- [ ] `requirements.txt` の削除
-- [ ] `enviornment.yml` の削除（typo版のファイル名）
+### Step 0.1: pyproject.toml と .python-version の作成 ✅
+- [x] `pyproject.toml` の作成（依存関係定義）
+- [x] `.python-version` の作成（Python 3.13 指定）
 
 **成果物:**
-- 旧ファイルの削除
+- `pyproject.toml` - PyTorch 2.8.0、PyTorch Geometric 2.7.0を含む依存関係定義
+- `.python-version` - Python 3.13指定
 
-### Step 0.3: uv 環境のセットアップと依存関係インストール
-- [ ] `uv sync` の実行（自動的に venv 作成と依存関係インストール）
-- [ ] 依存関係のバージョン確認
+### Step 0.2: requirements.txt と enviornment.yml の削除 ✅
+- [x] `requirements.txt` の削除
+- [x] `enviornment.yml` の削除（typo版のファイル名）
+
+**成果物:**
+- 旧ファイルの削除完了
+
+### Step 0.3: uv 環境のセットアップと依存関係インストール ✅
+- [x] `uv sync` の実行（自動的に venv 作成と依存関係インストール）
+- [x] 依存関係のバージョン確認
+
+**実行結果:**
+- Python 3.13.11環境を構築
+- PyTorch 2.8.0 (CPU版)インストール
+- PyTorch Geometric 2.7.0インストール
+- torch-cluster, torch-scatter, torch-sparseインストール（PyG CPU版）
 
 **検証コマンド:**
 ```bash
@@ -41,14 +47,15 @@ uv pip list
 uv run python -c "import torch; import torch_geometric; print(f'PyTorch: {torch.__version__}'); print('OK')"
 ```
 
-### Step 0.4: 既存テストと小規模学習の実行で動作検証
-- [ ] 既存テストの実行（`uv run pytest test/test_pytorch.py`, `uv run pytest test/test_torch_geometric.py`）
-- [ ] 小規模学習の実行（10ステップ）
+### Step 0.4: 既存テストと小規模学習の実行で動作検証 ✅
+- [x] 既存テストの実行（test_learned_simulator.py, test_graph_network.py, test_noise_utils.py）
+- [x] 小規模学習の実行（10ステップ）- WaterDropSampleデータで正常に実行、lossが2.18→1.83に減少
 
 **検証コマンド:**
 ```bash
-uv run pytest test/test_pytorch.py
-uv run pytest test/test_torch_geometric.py
+uv run python test/test_learned_simulator.py
+uv run python test/test_graph_network.py
+uv run python test/test_noise_utils.py
 uv run python -m gns.train --data_path=example/WaterDropSample/ \
   --model_path=models/test/ --ntraining_steps=10 --mode=train
 ```

@@ -5,11 +5,11 @@
 ## 進捗状況
 
 - [x] Phase 0: 環境構築 (4/4) ✅
-- [ ] Phase 1: アーキテクチャ分離 (3/13)
+- [ ] Phase 1: アーキテクチャ分離 (6/13)
 - [ ] Phase 2: モジュール/スクリプト明確化 (0/9)
 - [ ] Phase 3: 設定の整理 (0/3)
 
-**全体進捗: 7/29 タスク完了**
+**全体進捗: 10/29 タスク完了**
 
 ---
 
@@ -100,37 +100,70 @@ uv run python -m gns.train --data_path=example/WaterDropSample/ \
 ls rollouts/test_step1/
 ```
 
-### Step 2.1: gns/graph_model.py の作成（GraphNeuralNetworkModel クラス）
-- [ ] `gns/graph_model.py` の作成
-- [ ] `GraphNeuralNetworkModel` クラスの実装
+### Step 2.1: gns/graph_model.py の作成（GraphNeuralNetworkModel クラス） ✅
+- [x] `gns/graph_model.py` の作成
+- [x] `GraphNeuralNetworkModel` クラスの実装
   - グラフ構築
   - メッセージパッシング
   - forward pass
 
 **成果物:**
-- `gns/graph_model.py`
+- `gns/graph_model.py` - 純粋なGNNモデル（210行）
+  - `_compute_graph_connectivity()` - グラフ接続性の計算
+  - `build_graph_features()` - ノード・エッジ特徴量の構築
+  - `predict()` - GNNのforward pass
 
-### Step 2.2: gns/learned_simulator.py を GraphNeuralNetworkModel をラップする形にリファクタリング
-- [ ] `LearnedSimulator` クラスを `GraphNeuralNetworkModel` をラップする形にリファクタリング
-- [ ] 正規化、オイラー積分、位置/加速度予測のメソッドを維持
-- [ ] `save()`, `load()` メソッドを維持
+### Step 2.2: gns/learned_simulator.py を GraphNeuralNetworkModel をラップする形にリファクタリング ✅
+- [x] `LearnedSimulator` クラスを `GraphNeuralNetworkModel` をラップする形にリファクタリング
+- [x] 正規化、オイラー積分、位置/加速度予測のメソッドを維持
+- [x] `save()`, `load()` メソッドを維持
 
 **影響範囲:**
-- `gns/learned_simulator.py` 全体（388行）
+- `gns/learned_simulator.py` 全体（388行 → 297行、91行削減）
 
-### Step 2.3: インポート確認と学習・rollout実行で検証
-- [ ] モジュールのインポート確認
-- [ ] 学習とrolloutの実行で検証
+**実装結果:**
+- GNN部分を `GraphNeuralNetworkModel` に委譲
+- `LearnedSimulator` は物理統合（正規化、オイラー積分）に集中
+- 既存APIを完全に保持（後方互換性）
+
+### Step 2.3: インポート確認と学習・rollout実行で検証 ✅
+- [x] モジュールのインポート確認
+- [x] 学習とrolloutの実行で検証
+
+**検証結果:**
+- インポートテスト成功
+- 10ステップ学習成功（loss: 2.03 → 1.61）
+- rollout実行成功（平均loss: 0.137）
+- 出力ファイル生成確認（rollout_ex0.pkl, rollout_ex1.pkl）
 
 **検証コマンド:**
 ```bash
-python -c "from gns.learned_simulator import LearnedSimulator; \
+uv run python -c "from gns.learned_simulator import LearnedSimulator; \
 from gns.graph_model import GraphNeuralNetworkModel; \
 print('Import successful')"
 
-python -m gns.train --data_path=example/WaterDropSample/ \
-  --model_path=models/test/ --ntraining_steps=10 --mode=train
+uv run python -m gns.train --data_path=example/WaterDropSample/ \
+  --model_path=models/test_step2/ --ntraining_steps=10 --mode=train
+
+uv run python -m gns.train --data_path=example/WaterDropSample/ \
+  --model_path=models/test_step2/ --model_file=model-10.pt \
+  --mode=rollout --output_path=rollouts/test_step2/
 ```
+
+### Step 2.4: 型アノテーションの修正 ✅
+- [x] `X | None` 記法への統一（4箇所）
+- [x] `boundaries` 型の統一（`np.ndarray`）
+- [x] 未使用インポートの削除
+- [x] `device` パラメータへの型アノテーション追加
+
+**実装結果:**
+- Python 3.10+ の `X | None` 記法を採用
+- `boundaries: np.ndarray` に統一（実装に合わせた型アノテーション）
+- 型安全性の向上とIDE補完の改善
+
+**関連ドキュメント:**
+- `docs/refactor/decisions/0001-keep-learned-simulator-as-nn-module.md`
+- `docs/refactor/decisions/0002-type-annotation-fixes.md`
 
 ### Step 3.1: gns/config.py の作成（SimulatorConfig dataclass）
 - [ ] `gns/config.py` の作成

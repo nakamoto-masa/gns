@@ -195,26 +195,25 @@ ls rollouts/test/
 
 **変更内容**:
 
-1. **既存ファイル修正**: `gns/learned_simulator.py`
-   - `LearnedSimulator` を `GraphNeuralNetworkModel` にリネーム
+1. **新規ファイル作成**: `gns/graph_model.py`
+   - `GraphNeuralNetworkModel` クラスを新規作成
    - 責務: グラフ構築、メッセージパッシング、forward pass
-   - 削除: 正規化統計、境界条件（PhysicsSimulatorへ移動）
+   - 純粋なGNNモデルのみを提供
 
-2. **新規ファイル作成**: `gns/simulator.py`
-   - `PhysicsSimulator` クラス
-   - `GraphNeuralNetworkModel` をラップ
+2. **既存ファイル修正**: `gns/learned_simulator.py`
+   - `LearnedSimulator` クラス名はそのまま維持
+   - `GraphNeuralNetworkModel` をラップする形にリファクタリング
    - 責務: 正規化、オイラー積分、位置/加速度予測
    - メソッド: `predict_positions()`, `predict_accelerations()`, `save()`, `load()`
 
 3. **既存ファイル修正**: `gns/train.py`, `gns/train_multinode.py`
-   - `from gns.learned_simulator import LearnedSimulator`
-     → `from gns.simulator import PhysicsSimulator`
+   - `from gns.learned_simulator import LearnedSimulator` はそのまま維持（変更不要）
 
-**解決する課題**: 課題4 - GNNモデルだけを使いたいユーザーは `GraphNeuralNetworkModel` を、物理予測が必要なユーザーは `PhysicsSimulator` を使える
+**解決する課題**: 課題4 - GNNモデルだけを使いたいユーザーは `GraphNeuralNetworkModel` を、物理予測が必要なユーザーは `LearnedSimulator` を使える
 
 **影響範囲**:
 - `gns/learned_simulator.py` 全体（388行）
-- `gns/train.py`, `gns/train_multinode.py` のimport文と`_get_simulator()` 関数
+- 新規ファイル: `gns/graph_model.py`
 
 **検証方法**:
 ```bash
@@ -223,12 +222,12 @@ python -m gns.train --data_path=example/WaterDropSample/ \
   --model_path=models/test/ --ntraining_steps=10 --mode=train
 
 # モジュールのインポート確認
-python -c "from gns.simulator import PhysicsSimulator; \
-from gns.learned_simulator import GraphNeuralNetworkModel; \
+python -c "from gns.learned_simulator import LearnedSimulator; \
+from gns.graph_model import GraphNeuralNetworkModel; \
 print('Import successful')"
 ```
 
-**規模**: 大（388行のクラスを分割、多数のインポート文を修正）
+**規模**: 大（388行のクラスを分割、既存コードへの影響は最小限）
 
 ---
 
@@ -508,7 +507,7 @@ Phase 3: 環境・設定統一（Step 0で先行実施済み）
 ├── gns/                          # 再利用可能なモジュールのみ
 │   ├── config.py                 # NEW - Step 3
 │   ├── inference_utils.py        # NEW - Step 1
-│   ├── simulator.py              # NEW - Step 2
+│   ├── graph_model.py            # NEW - Step 2
 │   ├── learned_simulator.py      # MODIFIED - Step 2
 │   ├── training.py               # NEW - Step 5, 8
 │   ├── rollout.py                # NEW - Step 5
@@ -563,7 +562,7 @@ Phase 3: 環境・設定統一（Step 0で先行実施済み）
 ### 新規作成ファイル
 
 1. **gns/inference_utils.py** - Step 1
-2. **gns/simulator.py** - Step 2
+2. **gns/graph_model.py** - Step 2
 3. **gns/config.py** - Step 3
 4. **gns/training.py** - Step 5
 5. **gns/rollout.py** - Step 5

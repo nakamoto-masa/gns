@@ -65,33 +65,9 @@
 2. **新規ファイル作成**: `.python-version`
    - uv で使用する Python バージョンを指定（3.13）
 
-3. **新規スクリプト作成**: `scripts/setup/setup_uv_environment.sh`
-   - uv のインストール
-   - Python 3.13 環境の作成
-   - 依存関係のインストール
-   - 実行例:
-     ```bash
-     #!/bin/bash
-     # Install uv if not already installed
-     if ! command -v uv &> /dev/null; then
-         curl -LsSf https://astral.sh/uv/install.sh | sh
-     fi
-
-     # Create virtual environment with Python 3.13
-     uv venv --python 3.13
-
-     # Activate and install dependencies
-     source .venv/bin/activate
-     uv pip install -e .
-     ```
-
-4. **既存ファイル保持**: `requirements.txt`, `enviornment.yml`
+3. **既存ファイル保持**: `requirements.txt`, `enviornment.yml`
    - 後方互換性のため残す
    - ファイル先頭に "DEPRECATED: Use pyproject.toml instead" のコメント追加
-
-5. **`.gitignore` 更新**:
-   - `.venv/` を追加（uv の仮想環境）
-   - `uv.lock` を追加（依存関係のロックファイル）
 
 **解決する課題**:
 - pyright-lsp が正常に動作し、リファクタリング中に型チェック・コード補完が使える
@@ -99,17 +75,15 @@
 - 課題1（環境定義の一元化）を先行して解決
 
 **影響範囲**:
-- 新規ファイル: `pyproject.toml`, `.python-version`, `scripts/setup/setup_uv_environment.sh`
+- 新規ファイル: `pyproject.toml`, `.python-version`
 - 修正ファイル: `requirements.txt`, `enviornment.yml` (deprecation コメント追加)
-- `.gitignore`
 
 **検証方法**:
 ```bash
 # uv 環境のセットアップ
-bash scripts/setup/setup_uv_environment.sh
-
-# 仮想環境の有効化
+uv venv --python 3.13
 source .venv/bin/activate
+uv pip install -e .
 
 # 依存関係の確認
 uv pip list
@@ -547,8 +521,7 @@ Phase 3: 環境・設定統一（Step 0で先行実施済み）
 │   ├── train.py                  # MOVED - Step 5
 │   ├── train_multinode.py        # MOVED - Step 5
 │   ├── render_rollout.py         # MOVED - Step 5
-│   ├── setup/                    # NEW - Step 0, 6
-│   │   ├── setup_uv_environment.sh      # NEW - Step 0
+│   ├── setup/                    # NEW - Step 6
 │   │   ├── create_environment.sh        # MOVED - Step 6
 │   │   ├── create_environment_frontera.sh # MOVED - Step 6
 │   │   ├── load_modules.sh             # MOVED - Step 6
@@ -559,8 +532,6 @@ Phase 3: 環境・設定統一（Step 0で先行実施済み）
 │
 ├── pyproject.toml                # NEW - Step 0（依存関係の真実の情報源）
 ├── .python-version               # NEW - Step 0
-├── .venv/                        # NEW - Step 0（gitignoreに追加）
-├── uv.lock                       # NEW - Step 0（gitignoreに追加）
 ├── requirements.txt              # DEPRECATED - Step 0（後方互換性のため保持）
 ├── enviornment.yml               # DEPRECATED - Step 0（後方互換性のため保持）
 ├── slurm_scripts/                # 既存（変更なし）
@@ -668,7 +639,7 @@ Phase 3: 環境・設定統一（Step 0で先行実施済み）
 この状態で、ユーザーは:
 - ✅ 必要な機能だけをインポートして使える
 - ✅ モジュールとスクリプトの区別が明確
-- ✅ 環境構築の手順が明確（`bash scripts/setup/setup_uv_environment.sh` で完結）
+- ✅ 環境構築の手順が明確（`uv venv --python 3.13 && uv pip install -e .` で完結）
 - ✅ スクリプトの目的が明確
 - ✅ 最新の Python エコシステムの恩恵を受けられる（Python 3.13, PyTorch 2.6+, numpy 2.1+）
 - ✅ リファクタリング中も型チェック・補完が機能し、効率的に作業できる

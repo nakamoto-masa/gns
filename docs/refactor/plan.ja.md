@@ -320,11 +320,11 @@ gns/ パッケージを再利用可能なモジュールのみに限定し、実
      - `save_rollout()` - 結果保存
 
 3. **ファイル移動**:
-   - `gns/train.py` → `scripts/train.py`（CLI部分のみ、ロジックは `gns/training.py` へ）
-   - `gns/train_multinode.py` → `scripts/train_multinode.py`（同様）
-   - `gns/render_rollout.py` → `scripts/render_rollout.py`
+   - `gns/train.py` → `scripts/gns_train.py`（CLI部分のみ、ロジックは `gns/training.py` へ）
+   - `gns/train_multinode.py` → `scripts/gns_train_multinode.py`（同様）
+   - `gns/render_rollout.py` → `scripts/gns_render_rollout.py`
 
-4. **既存ファイル修正**: `scripts/train.py`
+4. **既存ファイル修正**: `scripts/gns_train.py`
    - FLAGSの解析とCLIエントリポイントのみ保持
    - 実際のロジックは `gns.training` の関数を呼び出す
 
@@ -338,7 +338,7 @@ gns/ パッケージを再利用可能なモジュールのみに限定し、実
 **検証方法**:
 ```bash
 # 新しいスクリプト位置から実行
-python scripts/train.py --data_path=example/WaterDropSample/ \
+python scripts/gns_train.py --data_path=example/WaterDropSample/ \
   --model_path=models/test/ --ntraining_steps=10 --mode=train
 
 # モジュールインポート確認
@@ -453,7 +453,7 @@ python -c "import torch; import torch_geometric; print('OK')"
      - 運動学的粒子のマスク適用
    - 現在 `train.py` の387-419行にあるインライン処理を抽出
 
-2. **既存ファイル修正**: `scripts/train.py`, `scripts/train_multinode.py`
+2. **既存ファイル修正**: `scripts/gns_train.py`, `scripts/gns_train_multinode.py`
    - 学習ループ内で `prepare_training_batch()` を呼び出す
 
 **解決する課題**: 課題4 - 学習バッチの準備ロジックを再利用可能にする
@@ -517,9 +517,9 @@ Phase 3: 環境・設定統一（Step 0で先行実施済み）
 │   └── noise_utils.py            # 既存（変更なし）
 │
 ├── scripts/                      # 実行スクリプト
-│   ├── train.py                  # MOVED - Step 5
-│   ├── train_multinode.py        # MOVED - Step 5
-│   ├── render_rollout.py         # MOVED - Step 5
+│   ├── gns_train.py              # MOVED - Step 5
+│   ├── gns_train_multinode.py    # MOVED - Step 5
+│   ├── gns_render_rollout.py     # MOVED - Step 5
 │   ├── setup/                    # NEW - Step 6
 │   │   ├── create_environment.sh        # MOVED - Step 6
 │   │   ├── create_environment_frontera.sh # MOVED - Step 6
@@ -575,13 +575,13 @@ Phase 3: 環境・設定統一（Step 0で先行実施済み）
 
 1. **小規模学習の実行**（10ステップ）
    ```bash
-   python scripts/train.py --data_path=example/WaterDropSample/ \
+   python scripts/gns_train.py --data_path=example/WaterDropSample/ \
      --model_path=models/test/ --ntraining_steps=10 --mode=train
    ```
 
 2. **Rolloutの実行**
    ```bash
-   python scripts/train.py --data_path=example/WaterDropSample/ \
+   python scripts/gns_train.py --data_path=example/WaterDropSample/ \
      --model_path=models/test/ --model_file=model-10.pt \
      --mode=rollout --output_path=rollouts/test/
    ```
@@ -608,7 +608,7 @@ Phase 3: 環境・設定統一（Step 0で先行実施済み）
 
 ### 課題2: 既存のSLURMスクリプトとの互換性
 
-**対策**: `slurm_scripts/` は今回変更せず、`scripts/train.py` が元の `gns/train.py` と同じインターフェースを維持
+**対策**: `slurm_scripts/` は今回変更せず、`scripts/gns_train.py` が元の `gns/train.py` と同じインターフェースを維持
 
 ### 課題3: テストコードの不足
 

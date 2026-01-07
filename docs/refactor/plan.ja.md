@@ -32,7 +32,7 @@
 - 責務ごとの分離を優先
 - モジュールとスクリプトの明確化
 
-## 実装ステップ（9段階）
+## 実装ステップ（7段階）
 
 ### Phase 0: 環境構築（Step 0）
 
@@ -65,9 +65,8 @@
 2. **新規ファイル作成**: `.python-version`
    - uv で使用する Python バージョンを指定（3.13）
 
-3. **既存ファイル保持**: `requirements.txt`, `enviornment.yml`
-   - 後方互換性のため残す
-   - ファイル先頭に "DEPRECATED: Use pyproject.toml instead" のコメント追加
+3. **既存ファイル削除**: `requirements.txt`, `enviornment.yml`
+   - `pyproject.toml` に一元化するため削除
 
 **解決する課題**:
 - pyright-lsp が正常に動作し、リファクタリング中に型チェック・コード補完が使える
@@ -76,7 +75,7 @@
 
 **影響範囲**:
 - 新規ファイル: `pyproject.toml`, `.python-version`
-- 修正ファイル: `requirements.txt`, `enviornment.yml` (deprecation コメント追加)
+- 削除ファイル: `requirements.txt`, `enviornment.yml`
 
 **検証方法**:
 ```bash
@@ -314,7 +313,7 @@ gns/ パッケージを再利用可能なモジュールのみに限定し、実
      - `train_step()` - 1ステップの学習
      - `validation_step()` - 1ステップの検証
      - `save_checkpoint()`, `load_checkpoint()` - チェックポイント管理
-     - `prepare_training_batch()` - バッチ準備（Step 8で実装）
+     - `prepare_training_batch()` - バッチ準備（Step 7で実装）
    - `gns/rollout.py` - 再利用可能なrolloutロジック
      - `run_rollout()` - rollout実行
      - `save_rollout()` - 結果保存
@@ -391,55 +390,13 @@ bash scripts/examples/train_water_drop.sh
 
 ---
 
-### Phase 3: 環境・設定の統一（Steps 7-8）
+### Phase 3: 設定の整理（Step 7）
 
-環境定義を統一し、設定の扱いを整理する。
-
----
-
-### Step 7: 環境定義ファイルの統一
-
-**目的**: 依存関係の定義を一元化し、不整合をなくす。
-
-**変更内容**:
-
-1. **既存ファイル修正**: `environment.yml`
-   - ファイル名のtypo修正（`enviornment.yml` → `environment.yml`）
-   - ファイル先頭にコメント追加: "Use requirements.txt as the source of truth"
-
-2. **既存ファイル維持**: `requirements.txt`
-   - 依存関係の唯一の真実の情報源として維持
-   - CI（`.circleci/config.yml`）が既に使用中
-
-3. **新規ファイル作成**: `scripts/setup/create_conda_environment.sh`
-   - `requirements.txt` を使ってconda環境を作成するスクリプト
-
-4. **ドキュメント更新**: `README.md`（存在する場合）
-   - どの環境定義ファイルを使うべきかを明記
-
-**解決する課題**: 課題1 - 環境定義の一元化
-
-**影響範囲**:
-- `environment.yml` (typo修正とコメント追加)
-- `scripts/setup/` の新規スクリプト
-
-**検証方法**:
-```bash
-# pip インストールのテスト
-pip install -r requirements.txt
-python -c "import torch; import torch_geometric; print('OK')"
-
-# conda環境作成のテスト
-bash scripts/setup/create_conda_environment.sh
-conda activate gns
-python -c "import torch; import torch_geometric; print('OK')"
-```
-
-**規模**: 小（主にドキュメントとスクリプト追加）
+学習バッチ準備処理を整理する。
 
 ---
 
-### Step 8: 学習ループ内の特徴抽出処理の関数化
+### Step 7: 学習ループ内の特徴抽出処理の関数化
 
 **目的**: 学習バッチの準備処理を再利用可能にする。
 
@@ -489,16 +446,15 @@ Phase 2: モジュール/スクリプト明確化
     ↓
   Step 6 (シェルスクリプト整理) - Step 0完了後（Step 5と並行可能）
 
-Phase 3: 環境・設定統一（Step 0で先行実施済み）
-  Step 7 (環境定義統一) - Step 0で大部分を実施済み、残作業のみ
-    ↓
-  Step 8 (バッチ準備関数化) - Step 5に依存
+Phase 3: 設定の整理
+  Step 7 (バッチ準備関数化) - Step 5に依存
 ```
 
 **重要**: Step 0（uv環境構築）は最初に必ず実施する。これにより：
 - リファクタリング中に pyright-lsp が正常動作
 - 型チェック・コード補完が利用可能
 - 最新パッケージでの検証が可能
+- 課題1（環境定義の一元化）を完全に解決
 
 ## 最終的なディレクトリ構造
 
@@ -509,7 +465,7 @@ Phase 3: 環境・設定統一（Step 0で先行実施済み）
 │   ├── inference_utils.py        # NEW - Step 1
 │   ├── graph_model.py            # NEW - Step 2
 │   ├── learned_simulator.py      # MODIFIED - Step 2
-│   ├── training.py               # NEW - Step 5, 8
+│   ├── training.py               # NEW - Step 5, 7
 │   ├── rollout.py                # NEW - Step 5
 │   ├── graph_network.py          # 既存（変更なし）
 │   ├── data_loader.py            # 既存（変更なし）
@@ -529,10 +485,8 @@ Phase 3: 環境・設定統一（Step 0で先行実施済み）
 │   │   └── train_water_drop.sh
 │   └── README.md                 # NEW - Step 6
 │
-├── pyproject.toml                # NEW - Step 0（依存関係の真実の情報源）
+├── pyproject.toml                # NEW - Step 0（依存関係の唯一の情報源）
 ├── .python-version               # NEW - Step 0
-├── requirements.txt              # DEPRECATED - Step 0（後方互換性のため保持）
-├── enviornment.yml               # DEPRECATED - Step 0（後方互換性のため保持）
 ├── slurm_scripts/                # 既存（変更なし）
 ├── test/                         # 既存（変更なし）
 └── ...
@@ -551,12 +505,9 @@ Phase 3: 環境・設定統一（Step 0で先行実施済み）
 
 3. **gns/train_multinode.py** (~25KB)
    - `gns/train.py` と同様の変更が必要
-   - 最終的に `scripts/train_multinode.py` に移動
+   - 最終的に `scripts/gns_train_multinode.py` に移動
 
-4. **requirements.txt**
-   - Step 7で依存関係の真実の情報源として位置づけ
-
-5. **gns/reading_utils.py**
+4. **gns/reading_utils.py**
    - Step 3, 4で `config.py` から利用される（変更は不要）
 
 ### 新規作成ファイル
@@ -567,7 +518,6 @@ Phase 3: 環境・設定統一（Step 0で先行実施済み）
 4. **gns/training.py** - Step 5
 5. **gns/rollout.py** - Step 5
 6. **scripts/README.md** - Step 6
-7. **scripts/setup/create_conda_environment.sh** - Step 7
 
 ## 検証戦略
 
@@ -616,19 +566,20 @@ Phase 3: 環境・設定統一（Step 0で先行実施済み）
 
 ## 完了基準
 
-全9ステップ完了後、以下が達成されていること:
+全7ステップ完了後、以下が達成されていること:
 
 1. ✅ **環境定義が `pyproject.toml` に一元化**（Step 0）
    - uv で管理される最新の Python 3.13 環境
    - pyright-lsp が正常動作し、型チェック・コード補完が利用可能
+   - 旧環境定義ファイル（`requirements.txt`, `enviornment.yml`）を削除
 
 2. ✅ **シェルスクリプトが `scripts/setup/`, `scripts/examples/` に整理**（Step 6）
    - 目的別に整理され、わかりやすい命名
 
 3. ✅ **`gns/` パッケージが再利用可能なモジュールのみを含む**（Step 5）
-   - 実行スクリプトは `scripts/` に移動
+   - 実行スクリプトは `scripts/` に移動（`gns_train.py` など）
 
-4. ✅ **推論、運動学的制約、学習バッチ準備が独立した関数として抽出可能**（Steps 1, 8）
+4. ✅ **推論、運動学的制約、学習バッチ準備が独立した関数として抽出可能**（Steps 1, 7）
    - `inference_utils.py` で推論ロジックを提供
    - `training.py` で学習ロジックを提供
 

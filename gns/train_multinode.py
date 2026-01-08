@@ -508,6 +508,58 @@ def train(rank, flags, world_size, verbose):
     torch.distributed.destroy_process_group()
 
 
+def create_simulator(
+        simulator_config: config.SimulatorConfig,
+        normalization_stats: dict[str, dict[str, torch.Tensor]],
+        feature_dims: dict[str, int],
+        connectivity_radius: float,
+        boundaries: np.ndarray,
+        boundary_clamp_limit: float,
+        device: torch.device) -> learned_simulator.LearnedSimulator:
+  """Create a simulator instance from configuration and computed parameters.
+
+  This function handles the actual instantiation of the LearnedSimulator,
+  separating simulator creation from configuration interpretation.
+
+  Args:
+    simulator_config: Simulator configuration.
+    normalization_stats: Normalization statistics for acceleration and velocity.
+    feature_dims: Feature dimensions including nnode_in, nedge_in, particle_dimensions.
+    connectivity_radius: Radius for connecting particles in the graph.
+    boundaries: Spatial boundaries of the simulation domain.
+    boundary_clamp_limit: Boundary clamp limit for training.
+    device: PyTorch device 'cpu' or 'cuda'.
+
+  Returns:
+    Initialized LearnedSimulator instance.
+
+  Example:
+    >>> normalization_stats = build_normalization_stats(metadata, 0.0003, 0.0003, device)
+    >>> feature_dims = infer_feature_dimensions(metadata, config)
+    >>> simulator = create_simulator(
+    ...     config, normalization_stats, feature_dims,
+    ...     metadata['default_connectivity_radius'],
+    ...     np.array(metadata['bounds']), 1.0, device)
+  """
+  simulator = learned_simulator.LearnedSimulator(
+      particle_dimensions=feature_dims['particle_dimensions'],
+      nnode_in=feature_dims['nnode_in'],
+      nedge_in=feature_dims['nedge_in'],
+      latent_dim=128,
+      nmessage_passing_steps=10,
+      nmlp_layers=2,
+      mlp_hidden_dim=128,
+      connectivity_radius=connectivity_radius,
+      boundaries=boundaries,
+      normalization_stats=normalization_stats,
+      nparticle_types=simulator_config.num_particle_types,
+      particle_type_embedding_size=16,
+      boundary_clamp_limit=boundary_clamp_limit,
+      device=device)
+
+  return simulator
+
+
 def _get_simulator(
         metadata: json,
         acc_noise_std: float,
@@ -524,45 +576,24 @@ def _get_simulator(
     device: PyTorch device 'cpu' or 'cuda'.
   """
 
-  # Normalization stats
-  normalization_stats = {
-      'acceleration': {
-          'mean': torch.FloatTensor(metadata['acc_mean']).to(device),
-          'std': torch.sqrt(torch.FloatTensor(metadata['acc_std'])**2 +
-                            acc_noise_std**2).to(device),
-      },
-      'velocity': {
-          'mean': torch.FloatTensor(metadata['vel_mean']).to(device),
-          'std': torch.sqrt(torch.FloatTensor(metadata['vel_std'])**2 +
-                            vel_noise_std**2).to(device),
-      },
-  }
+  # Build normalization statistics from metadata
+  normalization_stats = config.build_normalization_stats(
+      metadata, acc_noise_std, vel_noise_std, device)
 
-  # Get necessary parameters for loading simulator.
-  if "nnode_in" in metadata and "nedge_in" in metadata:
-    nnode_in = metadata['nnode_in']
-    nedge_in = metadata['nedge_in']
-  else:
-    # Given that there is no additional node feature (e.g., material_property) except for:
-    # (position (dim), velocity (dim*6), particle_type (16)),
-    nnode_in = 37 if metadata['dim'] == 3 else 30
-    nedge_in = metadata['dim'] + 1
+  # Infer feature dimensions from metadata
+  feature_dims = config.infer_feature_dimensions(metadata, simulator_config)
 
-  # Init simulator.
-  simulator = learned_simulator.LearnedSimulator(
-      particle_dimensions=metadata['dim'],
-      nnode_in=nnode_in,
-      nedge_in=nedge_in,
-      latent_dim=128,
-      nmessage_passing_steps=10,
-      nmlp_layers=2,
-      mlp_hidden_dim=128,
+  # Extract boundary clamp limit (default to 1.0 if not specified)
+  boundary_clamp_limit = metadata.get("boundary_augment", 1.0)
+
+  # Create simulator
+  simulator = create_simulator(
+      simulator_config=simulator_config,
+      normalization_stats=normalization_stats,
+      feature_dims=feature_dims,
       connectivity_radius=metadata['default_connectivity_radius'],
       boundaries=np.array(metadata['bounds']),
-      normalization_stats=normalization_stats,
-      nparticle_types=simulator_config.num_particle_types,
-      particle_type_embedding_size=16,
-      boundary_clamp_limit=metadata["boundary_augment"] if "boundary_augment" in metadata else 1.0,
+      boundary_clamp_limit=boundary_clamp_limit,
       device=device)
 
   return simulator

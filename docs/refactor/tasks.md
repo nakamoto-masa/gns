@@ -5,11 +5,11 @@
 ## 進捗状況
 
 - [x] Phase 0: 環境構築 (4/4) ✅
-- [ ] Phase 1: アーキテクチャ分離 (9/13)
+- [x] Phase 1: アーキテクチャ分離 (13/13) ✅
 - [ ] Phase 2: モジュール/スクリプト明確化 (0/9)
 - [ ] Phase 3: 設定の整理 (0/3)
 
-**全体進捗: 13/29 タスク完了**
+**全体進捗: 17/29 タスク完了**
 
 ---
 
@@ -208,28 +208,39 @@ uv run python -m gns.train --data_path=example/WaterDropSample/ \
   --mode=rollout --output_path=rollouts/test_step3/
 ```
 
-### Step 4.1: gns/config.py に build_normalization_stats と infer_feature_dimensions 関数追加
-- [ ] `build_normalization_stats()` 関数の実装
-- [ ] `infer_feature_dimensions()` 関数の実装
+### Step 4.1: gns/config.py に build_normalization_stats と infer_feature_dimensions 関数追加 ✅
+- [x] `build_normalization_stats()` 関数の実装
+- [x] `infer_feature_dimensions()` 関数の実装
+
+**成果物:**
+- `gns/config.py` - 2つの新しい関数を追加
+  - `build_normalization_stats()` - メタデータから正規化統計を構築（ノイズとの合成計算を含む）
+  - `infer_feature_dimensions()` - GNNの入力次元数を推論（nnode_in, nedge_in, particle_dimensions）
+
+### Step 4.2: gns/train.py の _get_simulator() 関数を分割 ✅
+- [x] `create_simulator()` 関数の新規作成
+- [x] `_get_simulator()` 関数（474-531行）を分割
+  - 設定読み込み部分 → `config.py` の関数群を使用
+  - シミュレータ生成部分 → `create_simulator()` 関数を使用
+- [x] `gns/train_multinode.py` にも同じ変更を適用
 
 **影響範囲:**
-- `gns/config.py`
+- `gns/train.py` - `create_simulator()` 関数追加、`_get_simulator()` 関数リファクタリング（56行 → 25行）
+- `gns/train_multinode.py` - 同様の変更
 
-### Step 4.2: gns/train.py の _get_simulator() 関数を分割
-- [ ] `_get_simulator()` 関数（503-558行）を分割
-  - 設定読み込み部分 → `config.py` の関数群
-  - シミュレータ生成部分 → `create_simulator()` 関数
-
-**影響範囲:**
-- `gns/train.py` の `_get_simulator()` 関数
-
-### Step 4.3: 学習実行で検証
-- [ ] 学習実行で検証
+### Step 4.3: 学習実行で検証 ✅
+- [x] 10ステップ学習実行 - 成功（loss: 1.94 → 1.36）
+- [x] rollout実行 - 成功（平均loss: 0.064）
+- [x] 出力ファイル生成確認 - rollout_ex0.pkl, rollout_ex1.pkl生成確認
 
 **検証コマンド:**
 ```bash
-python -m gns.train --data_path=example/WaterDropSample/ \
-  --model_path=models/test/ --ntraining_steps=10 --mode=train
+uv run python -m gns.train --data_path=example/WaterDropSample/ \
+  --model_path=models/test_step4/ --ntraining_steps=10 --mode=train
+
+uv run python -m gns.train --data_path=example/WaterDropSample/ \
+  --model_path=models/test_step4/ --model_file=model-10.pt \
+  --mode=rollout --output_path=rollouts/test_step4/
 ```
 
 ---

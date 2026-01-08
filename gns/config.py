@@ -6,6 +6,7 @@ including parameters that were previously hardcoded as global constants.
 
 from dataclasses import dataclass, field
 from typing import Any
+import torch
 
 
 @dataclass
@@ -84,3 +85,120 @@ class SimulatorConfig:
             nedge_in=metadata.get('nedge_in'),
             boundary_augment=metadata.get('boundary_augment'),
         )
+
+
+def build_normalization_stats(
+        metadata: dict[str, Any],
+        acc_noise_std: float,
+        vel_noise_std: float,
+        device: torch.device) -> dict[str, dict[str, torch.Tensor]]:
+    """Build normalization statistics from metadata.
+
+    This function extracts normalization statistics (mean and std) from metadata
+    and combines them with noise standard deviations for training.
+
+    The standard deviation is computed as:
+        combined_std = sqrt(metadata_std^2 + noise_std^2)
+
+    This accounts for both the inherent variability in the data and the noise
+    added during training.
+
+    Args:
+        metadata: Dictionary containing dataset metadata with 'acc_mean', 'acc_std',
+            'vel_mean', and 'vel_std' fields.
+        acc_noise_std: Standard deviation of noise added to accelerations during training.
+        vel_noise_std: Standard deviation of noise added to velocities during training.
+        device: PyTorch device ('cpu' or 'cuda') to place tensors on.
+
+    Returns:
+        Dictionary with normalization statistics in the format:
+        {
+            'acceleration': {'mean': tensor, 'std': tensor},
+            'velocity': {'mean': tensor, 'std': tensor}
+        }
+
+    Example:
+        >>> metadata = {'acc_mean': [0.0], 'acc_std': [1.0], ...}
+        >>> stats = build_normalization_stats(metadata, 0.0003, 0.0003, torch.device('cpu'))
+        >>> stats['acceleration']['mean']
+        tensor([0.])
+    """
+    normalization_stats = {
+        'acceleration': {
+            'mean': torch.FloatTensor(metadata['acc_mean']).to(device),
+            'std': torch.sqrt(torch.FloatTensor(metadata['acc_std'])**2 +
+                              acc_noise_std**2).to(device),
+        },
+        'velocity': {
+            'mean': torch.FloatTensor(metadata['vel_mean']).to(device),
+            'std': torch.sqrt(torch.FloatTensor(metadata['vel_std'])**2 +
+                              vel_noise_std**2).to(device),
+        },
+    }
+    return normalization_stats
+
+
+def infer_feature_dimensions(
+        metadata: dict[str, Any],
+        simulator_config: SimulatorConfig) -> dict[str, int]:
+    """Infer feature dimensions from metadata.
+
+    This function determines the number of input features for nodes and edges
+    in the graph neural network. If these dimensions are explicitly provided
+    in the metadata, they are used directly. Otherwise, they are computed
+    based on the spatial dimension and configuration parameters.
+
+    Node feature dimensions:
+        - position: dim
+        - velocity: dim * input_sequence_length
+        - particle_type: particle_type_embedding_size (16)
+        Total: dim + dim * input_sequence_length + 16
+
+    Edge feature dimensions:
+        - relative_position: dim
+        - distance: 1
+        Total: dim + 1
+
+    Args:
+        metadata: Dictionary containing dataset metadata. May include 'nnode_in'
+            and 'nedge_in' for explicit dimension specification.
+        simulator_config: Simulator configuration containing input_sequence_length.
+
+    Returns:
+        Dictionary with the following keys:
+        - 'nnode_in': Number of input features per node
+        - 'nedge_in': Number of input features per edge
+        - 'particle_dimensions': Spatial dimension (2 or 3)
+
+    Example:
+        >>> metadata = {'dim': 3}
+        >>> config = SimulatorConfig(input_sequence_length=6)
+        >>> dims = infer_feature_dimensions(metadata, config)
+        >>> dims['nnode_in']  # 3 + 3*6 + 16 = 37
+        37
+        >>> dims['nedge_in']  # 3 + 1 = 4
+        4
+    """
+    dim = metadata['dim']
+
+    # Check if dimensions are explicitly provided in metadata
+    if "nnode_in" in metadata and "nedge_in" in metadata:
+        nnode_in = metadata['nnode_in']
+        nedge_in = metadata['nedge_in']
+    else:
+        # Infer dimensions from spatial dimension and configuration
+        # Node features: position (dim) + velocity (dim * input_sequence_length) +
+        #                particle_type embedding (16)
+        particle_type_embedding_size = 16
+        nnode_in = (dim +
+                    dim * simulator_config.input_sequence_length +
+                    particle_type_embedding_size)
+
+        # Edge features: relative_position (dim) + distance (1)
+        nedge_in = dim + 1
+
+    return {
+        'nnode_in': nnode_in,
+        'nedge_in': nedge_in,
+        'particle_dimensions': dim
+    }

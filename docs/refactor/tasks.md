@@ -6,10 +6,10 @@
 
 - [x] Phase 0: 環境構築 (4/4) ✅
 - [x] Phase 1: アーキテクチャ分離 (13/13) ✅
-- [ ] Phase 2: モジュール/スクリプト明確化 (0/9)
-- [ ] Phase 3: 設定の整理 (0/3)
+- [ ] Phase 2: モジュール/スクリプト明確化 (5/9)
+- [x] Phase 3: 設定の整理 (3/3) ✅ (Step 5で実装済み)
 
-**全体進捗: 17/29 タスク完了**
+**全体進捗: 25/29 タスク完了**
 
 ---
 
@@ -247,52 +247,86 @@ uv run python -m gns.train --data_path=example/WaterDropSample/ \
 
 ## Phase 2: モジュール/スクリプト明確化
 
-### Step 5.1: scripts/ ディレクトリの作成
-- [ ] `scripts/` ディレクトリの作成
+### Step 5.1: scripts/ ディレクトリの作成 ✅
+- [x] `scripts/` ディレクトリの作成
 
 **成果物:**
 - `scripts/` ディレクトリ
 
-### Step 5.2: gns/training.py の作成（train_step, validation_step, checkpoint管理）
-- [ ] `gns/training.py` の作成
-- [ ] `train_step()` 関数の実装
-- [ ] `validation_step()` 関数の実装
-- [ ] `save_checkpoint()`, `load_checkpoint()` 関数の実装
+### Step 5.2: gns/training.py の作成（train_step, validation_step, checkpoint管理、run_training_loop） ✅
+- [x] `gns/training.py` の作成（788行）
+- [x] ユーティリティ関数の実装（`optimizer_to()`, `acceleration_loss()`）
+- [x] バッチ準備関数の実装（`prepare_training_batch()` - 15行のボイラープレート削減）
+- [x] 学習率管理の実装（`update_learning_rate()`）
+- [x] ノイズ追加の実装（`add_training_noise()`）
+- [x] 単一ステップ操作の実装（`train_step()`, `validation_step()`）
+- [x] チェックポイント管理の実装（`save_checkpoint()`, `load_checkpoint()`, `find_latest_checkpoint()`）
+- [x] シミュレータ生成の実装（`create_simulator()`, `get_simulator()`）
+- [x] データローディングの実装（`get_training_dataloader()`, `infer_dataset_features()`）
+- [x] **学習オーケストレーションの実装**（`run_training_loop()` - 最重要関数）
 
 **成果物:**
-- `gns/training.py`
+- `gns/training.py` (788行) - 再利用可能な学習ロジック
+  - 第1回実装で欠けていた高レベルオーケストレーション関数を追加
+  - バッチ準備のボイラープレート削減
+  - 学習率スケジューリングの関数化
 
-### Step 5.3: gns/rollout.py の作成（run_rollout, save_rollout）
-- [ ] `gns/rollout.py` の作成
-- [ ] `run_rollout()` 関数の実装
-- [ ] `save_rollout()` 関数の実装
+### Step 5.3: gns/rollout.py と gns/render.py の作成 ✅
+- [x] `gns/rollout.py` の作成（304行）
+  - データローディング（`get_rollout_dataloader()`, `infer_dataset_features()`）
+  - 単一rollout実行（`run_rollout()`）
+  - rollout保存（`save_rollout()`）
+  - バッチ予測（`predict_rollouts()`, `predict_rollouts_distributed()`）
+- [x] `gns/render.py` の作成（349行）
+  - データローディング（`load_rollout_pickle()`, `prepare_trajectory_data()`）
+  - 色マッピング（`TYPE_TO_COLOR`, `get_color_mask()`）
+  - 2D/3Dレンダリング（`render_2d_trajectory()`, `render_3d_trajectory()`）
+  - GIFアニメーション（`render_gif_animation()`）
+  - VTKエクスポート（`write_vtk_trajectory()`）
 
 **成果物:**
-- `gns/rollout.py`
+- `gns/rollout.py` (304行) - 再利用可能なrolloutロジック
+- `gns/render.py` (349行) - 再利用可能な可視化ロジック
 
-### Step 5.4: train.py, train_multinode.py, render_rollout.py を scripts/ へ移動・修正
-- [ ] `gns/train.py` → `scripts/gns_train.py` への移動・修正
-- [ ] `gns/train_multinode.py` → `scripts/gns_train_multinode.py` への移動・修正
-- [ ] `gns/render_rollout.py` → `scripts/gns_render_rollout.py` への移動
+### Step 5.4: train.py, train_multinode.py, render_rollout.py を scripts/ へ移動・修正 ✅
+- [x] `gns/train.py` (663行) → `scripts/gns_train.py` (181行) への変換
+- [x] `gns/train_multinode.py` → `scripts/gns_train_multinode.py` (214行) への変換
+- [x] `gns/render_rollout.py` (246行) → `scripts/gns_render_rollout.py` (56行) への変換
 
 **影響範囲:**
-- `gns/train.py` 全体（658行を分割）
-- `gns/train_multinode.py` 全体
-- `gns/render_rollout.py`
+- `gns/train.py` 全体（663行 → `gns/training.py` 788行 + `scripts/gns_train.py` 181行に分割）
+- `gns/train_multinode.py` 全体（→ `scripts/gns_train_multinode.py` 214行）
+- `gns/render_rollout.py` 全体（246行 → `scripts/gns_render_rollout.py` 56行に短縮、ロジックは`gns/render.py`へ）
 
-### Step 5.5: 新しいスクリプト位置から学習・rollout実行で検証
-- [ ] 新しいスクリプト位置から学習実行
-- [ ] rolloutの実行
-- [ ] モジュールインポート確認
+**実装結果:**
+- CLIスクリプトは薄いラッパー（50-200行）に
+- ビジネスロジックは再利用可能なモジュールに分離
+- コード重複を大幅に削減
+
+### Step 5.5: 新しいスクリプト位置から学習・rollout実行で検証 ✅
+- [x] 10ステップ学習実行 - 成功（loss: 2.24 → 1.90）
+- [x] rollout実行 - 成功（平均loss: 0.496）
+- [x] 出力ファイル生成確認 - rollout_ex0.pkl, rollout_ex1.pkl生成確認
+- [x] モジュールインポート確認 - 成功
 
 **検証コマンド:**
 ```bash
-python scripts/gns_train.py --data_path=example/WaterDropSample/ \
-  --model_path=models/test/ --ntraining_steps=10 --mode=train
+uv run python scripts/gns_train.py --data_path=example/WaterDropSample/ \
+  --model_path=models/test_step5_v2/ --ntraining_steps=10 --mode=train
 
-python -c "from gns.training import train_step; \
-from gns.rollout import run_rollout; print('Import successful')"
+uv run python scripts/gns_train.py --data_path=example/WaterDropSample/ \
+  --model_path=models/test_step5_v2/ --model_file=model-10.pt \
+  --mode=rollout --output_path=rollouts/test_step5_v2/
+
+uv run python -c "from gns.training import train_step, run_training_loop; \
+from gns.rollout import run_rollout, predict_rollouts; \
+from gns.render import render_gif_animation; print('Import successful')"
 ```
+
+**検証結果:**
+- 学習成功: チェックポイント（model-0.pt, model-10.pt, train_state-0.pt, train_state-10.pt）生成確認
+- rollout成功: rollout_ex0.pkl, rollout_ex1.pkl生成確認
+- インポートテスト成功
 
 ### Step 6.1: scripts/legacy/ ディレクトリの作成
 - [ ] `scripts/legacy/` ディレクトリの作成
@@ -330,34 +364,50 @@ ls *.sh 2>/dev/null || echo "ルートディレクトリにシェルスクリプ
 
 ---
 
-## Phase 3: 設定の整理
+## Phase 3: 設定の整理 ✅
 
-### Step 7.1: gns/training.py に prepare_training_batch 関数追加
-- [ ] `prepare_training_batch()` 関数の実装
+**注**: このPhaseで予定していた機能は、**Step 5で既に実装済み**です。Step 5の再設計により、バッチ準備処理もStep 5に統合されました。
+
+### Step 7.1: gns/training.py に prepare_training_batch 関数追加 ✅ (Step 5で実装済み)
+- [x] `prepare_training_batch()` 関数の実装
   - 特徴抽出（position, particle_type, material_property）
+  - デバイス移動とn_features条件分岐の一元化
+  - 15行のボイラープレートコードを1行の関数呼び出しに削減
+- [x] `add_training_noise()` 関数の実装
   - ノイズ生成
   - 運動学的粒子のマスク適用
 
 **影響範囲:**
-- `gns/training.py`
-- 元の実装: `gns/train.py` の387-419行
+- `gns/training.py` - Step 5.2で実装済み
+- 元の実装: `gns/train.py` の361-370行（バッチ準備）、376-379行（ノイズ追加）を抽出
 
-### Step 7.2: scripts/gns_train.py と gns_train_multinode.py で prepare_training_batch を使用
-- [ ] `scripts/gns_train.py` の学習ループで `prepare_training_batch()` を呼び出す
-- [ ] `scripts/gns_train_multinode.py` の学習ループで `prepare_training_batch()` を呼び出す
+**実装済みの内容:**
+- `prepare_training_batch()` - バッチ準備（gns/training.py:90-117行）
+- `add_training_noise()` - ノイズ追加（gns/training.py:128-154行）
+
+### Step 7.2: scripts/gns_train.py と gns_train_multinode.py で prepare_training_batch を使用 ✅ (Step 5で実装済み)
+- [x] `run_training_loop()` 内で `prepare_training_batch()` を自動的に呼び出し
+- [x] `run_training_loop()` 内で `add_training_noise()` を自動的に呼び出し
 
 **影響範囲:**
-- `scripts/gns_train.py` の学習ループ
-- `scripts/gns_train_multinode.py` の学習ループ
+- `gns/training.py` の `run_training_loop()` 関数内 (gns/training.py:665-676行)
+- CLIスクリプトは `run_training_loop()` を呼び出すのみ
 
-### Step 7.3: 学習実行で検証
-- [ ] 学習実行で検証
+**実装済みの内容:**
+- バッチ準備とノイズ追加は `run_training_loop()` 内で自動的に実行される
+- CLIスクリプト（`scripts/gns_train.py`, `scripts/gns_train_multinode.py`）は薄いラッパーとして実装
+
+### Step 7.3: 学習実行で検証 ✅ (Step 5で検証済み)
+- [x] 学習実行で検証 - Step 5.5で実施済み
 
 **検証コマンド:**
 ```bash
-python scripts/gns_train.py --data_path=example/WaterDropSample/ \
-  --model_path=models/test/ --ntraining_steps=10 --mode=train
+uv run python scripts/gns_train.py --data_path=example/WaterDropSample/ \
+  --model_path=models/test_step5_v2/ --ntraining_steps=10 --mode=train
 ```
+
+**検証結果:**
+- Step 5.5で実施済み（loss: 2.24 → 1.90）
 
 ---
 

@@ -292,30 +292,39 @@ gns/ パッケージを再利用可能なモジュールのみに限定し、実
 
 ### Step 5: 実行スクリプトの gns/ パッケージ外への移動
 
-**目的**: インポート可能なモジュールと実行スクリプトを明確に分離する。
+**目的**: インポート可能なモジュールと実行スクリプトを明確に分離する。スクリプトをCLI用の薄いラッパー（50-100行）にする。
+
+**注**: 詳細な実装計画は `docs/refactor/decisions/0003-step5-redesign-detailed-plan.md` を参照。
 
 **変更内容**:
 
 1. **新規ディレクトリ作成**: `scripts/`
 
-2. **新規ファイル作成**: `gns/training.py`, `gns/rollout.py`
-   - `gns/training.py` - 再利用可能な学習ロジック
-     - `train_step()` - 1ステップの学習
-     - `validation_step()` - 1ステップの検証
-     - `save_checkpoint()`, `load_checkpoint()` - チェックポイント管理
-     - `prepare_training_batch()` - バッチ準備（Step 7で実装）
-   - `gns/rollout.py` - 再利用可能なrolloutロジック
+2. **新規ファイル作成**: `gns/training.py`, `gns/rollout.py`, `gns/render.py`
+   - `gns/training.py` (400-450行) - 再利用可能な学習ロジック
+     - 低レベル: `train_step()`, `validation_step()`, `save_checkpoint()`, `load_checkpoint()`
+     - **重要**: `run_training_loop()` - 学習ループ全体のオーケストレーション（第1回で欠けていた最重要関数）
+     - **重要**: `prepare_training_batch()` - バッチ準備のボイラープレート削減
+     - **重要**: `update_learning_rate()` - 学習率スケジューリング
+     - シミュレータ生成: `create_simulator()`, `get_simulator()`
+   - `gns/rollout.py` (250-300行) - 再利用可能なrolloutロジック
      - `run_rollout()` - rollout実行
      - `save_rollout()` - 結果保存
+     - `predict_rollouts()`, `predict_rollouts_distributed()` - バッチ予測
+   - `gns/render.py` (300-350行) - 再利用可能な可視化ロジック
+     - `load_rollout_pickle()` - データ読み込み
+     - `render_2d_trajectory()`, `render_3d_trajectory()` - レンダリング
+     - `render_gif_animation()`, `write_vtk_trajectory()` - 出力
 
 3. **ファイル移動**:
-   - `gns/train.py` → `scripts/gns_train.py`（CLI部分のみ、ロジックは `gns/training.py` へ）
-   - `gns/train_multinode.py` → `scripts/gns_train_multinode.py`（同様）
-   - `gns/render_rollout.py` → `scripts/gns_render_rollout.py`
+   - `gns/train.py` (663行) → `scripts/gns_train.py` (60-80行)
+   - `gns/train_multinode.py` (669行) → `scripts/gns_train_multinode.py` (70-90行)
+   - `gns/render_rollout.py` (246行) → `scripts/gns_render_rollout.py` (35-50行)
 
 4. **既存ファイル修正**: `scripts/gns_train.py`
-   - FLAGSの解析とCLIエントリポイントのみ保持
-   - 実際のロジックは `gns.training` の関数を呼び出す
+   - FLAGSの解析とCLIエントリポイントのみ保持（約60-80行）
+   - 学習ループは `training.run_training_loop()` に完全に委譲
+   - バッチ準備は `training.prepare_training_batch()` に委譲
 
 **解決する課題**: 課題3 - `gns/` = インポート可能なモジュール、`scripts/` = 実行スクリプト
 
@@ -388,22 +397,20 @@ ls *.sh 2>/dev/null || echo "ルートディレクトリにシェルスクリプ
 
 ### Step 7: 学習ループ内の特徴抽出処理の関数化
 
-**目的**: 学習バッチの準備処理を再利用可能にする。
+**注**: このステップで予定していた `prepare_training_batch()` 関数は、**Step 5で既に実装済み**です。Step 5の再設計により、バッチ準備処理もStep 5に統合されました。
 
-**変更内容**:
+**目的**: （Step 5で達成済み）学習バッチの準備処理を再利用可能にする。
 
-1. **既存ファイル修正**: `gns/training.py`（Step 5で作成）
-   - `prepare_training_batch()` 関数追加
-   - 責務: データローダーから取得したexampleを処理
-     - 特徴抽出（position, particle_type, material_property）
-     - ノイズ生成
-     - 運動学的粒子のマスク適用
-   - 現在 `train.py` の387-419行にあるインライン処理を抽出
+**Step 5で実装済みの内容**:
 
-2. **既存ファイル修正**: `scripts/gns_train.py`, `scripts/gns_train_multinode.py`
-   - 学習ループ内で `prepare_training_batch()` を呼び出す
+1. **`gns/training.py`** に以下の関数を追加:
+   - `prepare_training_batch()` - バッチ準備（特徴抽出とデバイス移動）
+   - `add_training_noise()` - ノイズ生成と運動学的粒子のマスク適用
+   - 元のコード: `train.py` の387-419行にあったインライン処理を抽出
 
-**解決する課題**: 課題4 - 学習バッチの準備ロジックを再利用可能にする
+2. **`scripts/gns_train.py`** の `run_training_loop()` 内で自動的に呼び出される
+
+**解決する課題**: 課題4 - 学習バッチの準備ロジックを再利用可能にする（Step 5で達成）
 
 **影響範囲**:
 - `gns/train.py` の学習ループ（387-419行）
@@ -457,6 +464,7 @@ Phase 3: 設定の整理
 │   ├── learned_simulator.py      # MODIFIED - Step 2
 │   ├── training.py               # NEW - Step 5, 7
 │   ├── rollout.py                # NEW - Step 5
+│   ├── render.py                 # NEW - Step 5
 │   ├── graph_network.py          # 既存（変更なし）
 │   ├── data_loader.py            # 既存（変更なし）
 │   ├── reading_utils.py          # 既存（変更なし）
@@ -506,7 +514,8 @@ Phase 3: 設定の整理
 3. **gns/config.py** - Step 3
 4. **gns/training.py** - Step 5
 5. **gns/rollout.py** - Step 5
-6. **scripts/README.md** - Step 6
+6. **gns/render.py** - Step 5
+7. **scripts/README.md** - Step 6
 
 ## 検証戦略
 
@@ -563,7 +572,8 @@ Phase 3: 設定の整理
    - 旧環境定義ファイル（`requirements.txt`, `enviornment.yml`）を削除
 
 2. ✅ **不要なシェルスクリプトが `scripts/legacy/` に退避**（Step 6）
-   - ルートディレクトリがクリーンになり、重要なファイルが明確
+   - 旧スクリプトをlegacyフォルダに移動
+   - scripts/README.mdで明確なドキュメント
 
 3. ✅ **`gns/` パッケージが再利用可能なモジュールのみを含む**（Step 5）
    - 実行スクリプトは `scripts/` に移動（`gns_train.py` など）

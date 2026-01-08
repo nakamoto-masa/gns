@@ -292,30 +292,39 @@ Limit `gns/` package to reusable modules only, separate execution scripts.
 
 ### Step 5: Move Execution Scripts Outside gns/ Package
 
-**Purpose**: Clearly separate importable modules from execution scripts.
+**Purpose**: Clearly separate importable modules from execution scripts. Make scripts thin CLI wrappers (50-100 lines).
+
+**Note**: See `docs/refactor/decisions/0003-step5-redesign-detailed-plan.md` for detailed implementation plan.
 
 **Changes**:
 
 1. **Create new directory**: `scripts/`
 
-2. **Create new files**: `gns/training.py`, `gns/rollout.py`
-   - `gns/training.py` - Reusable training logic
-     - `train_step()` - Single training step
-     - `validation_step()` - Single validation step
-     - `save_checkpoint()`, `load_checkpoint()` - Checkpoint management
-     - `prepare_training_batch()` - Batch preparation (implemented in Step 7)
-   - `gns/rollout.py` - Reusable rollout logic
+2. **Create new files**: `gns/training.py`, `gns/rollout.py`, `gns/render.py`
+   - `gns/training.py` (400-450 lines) - Reusable training logic
+     - Low-level: `train_step()`, `validation_step()`, `save_checkpoint()`, `load_checkpoint()`
+     - **Important**: `run_training_loop()` - Orchestrates entire training loop (most critical function missing in first attempt)
+     - **Important**: `prepare_training_batch()` - Reduces batch preparation boilerplate
+     - **Important**: `update_learning_rate()` - Learning rate scheduling
+     - Simulator creation: `create_simulator()`, `get_simulator()`
+   - `gns/rollout.py` (250-300 lines) - Reusable rollout logic
      - `run_rollout()` - Rollout execution
      - `save_rollout()` - Save results
+     - `predict_rollouts()`, `predict_rollouts_distributed()` - Batch prediction
+   - `gns/render.py` (300-350 lines) - Reusable rendering logic
+     - `load_rollout_pickle()` - Data loading
+     - `render_2d_trajectory()`, `render_3d_trajectory()` - Rendering
+     - `render_gif_animation()`, `write_vtk_trajectory()` - Output
 
 3. **Move files**:
-   - `gns/train.py` → `scripts/gns_train.py` (CLI only, logic → `gns/training.py`)
-   - `gns/train_multinode.py` → `scripts/gns_train_multinode.py` (same)
-   - `gns/render_rollout.py` → `scripts/gns_render_rollout.py`
+   - `gns/train.py` (663 lines) → `scripts/gns_train.py` (60-80 lines)
+   - `gns/train_multinode.py` (669 lines) → `scripts/gns_train_multinode.py` (70-90 lines)
+   - `gns/render_rollout.py` (246 lines) → `scripts/gns_render_rollout.py` (35-50 lines)
 
 4. **Modify existing file**: `scripts/gns_train.py`
-   - Keep only FLAGS parsing and CLI entry point
-   - Call functions from `gns.training` for actual logic
+   - Keep only FLAGS parsing and CLI entry point (~60-80 lines)
+   - Training loop fully delegates to `training.run_training_loop()`
+   - Batch preparation delegates to `training.prepare_training_batch()`
 
 **Resolves**: Issue 3 - `gns/` = importable modules, `scripts/` = executables
 
@@ -388,22 +397,20 @@ Organize training batch preparation processing.
 
 ### Step 7: Functionalize Training Loop Feature Extraction
 
-**Purpose**: Make training batch preparation logic reusable.
+**Note**: The `prepare_training_batch()` function planned for this step was **already implemented in Step 5**. Step 5's redesign integrated batch preparation processing into Step 5.
 
-**Changes**:
+**Purpose**: (Achieved in Step 5) Make training batch preparation logic reusable.
 
-1. **Modify existing file**: `gns/training.py` (created in Step 5)
-   - Add `prepare_training_batch()` function
-   - Responsibilities: Process examples from dataloader
-     - Feature extraction (position, particle_type, material_property)
-     - Noise generation
-     - Kinematic particle masking
-   - Extract inline processing currently in `train.py` lines 387-419
+**Implemented in Step 5**:
 
-2. **Modify existing files**: `scripts/gns_train.py`, `scripts/gns_train_multinode.py`
-   - Call `prepare_training_batch()` in training loop
+1. Added the following functions to **`gns/training.py`**:
+   - `prepare_training_batch()` - Batch preparation (feature extraction and device transfer)
+   - `add_training_noise()` - Noise generation and kinematic particle masking
+   - Original code: Extracted inline processing from lines 387-419 in `train.py`
 
-**Resolves**: Issue 4 - Training batch preparation logic is reusable
+2. Automatically called within `run_training_loop()` in **`scripts/gns_train.py`**
+
+**Resolves**: Issue 4 - Training batch preparation logic is reusable (achieved in Step 5)
 
 **Impact**:
 - Training loop in `gns/train.py` (lines 387-419)
@@ -457,6 +464,7 @@ Phase 3: Configuration Organization
 │   ├── learned_simulator.py      # MODIFIED - Step 2
 │   ├── training.py               # NEW - Step 5, 7
 │   ├── rollout.py                # NEW - Step 5
+│   ├── render.py                 # NEW - Step 5
 │   ├── graph_network.py          # Existing (no changes)
 │   ├── data_loader.py            # Existing (no changes)
 │   ├── reading_utils.py          # Existing (no changes)
@@ -466,8 +474,8 @@ Phase 3: Configuration Organization
 │   ├── gns_train.py              # MOVED - Step 5
 │   ├── gns_train_multinode.py    # MOVED - Step 5
 │   ├── gns_render_rollout.py     # MOVED - Step 5
-│   ├── README.md                 # NEW - Step 6
-│   └── legacy/                   # MOVED - Step 6
+│   ├── README.md                 # NEW - Step 6 (script descriptions)
+│   └── legacy/                   # MOVED - Step 6 (archived legacy scripts)
 │       ├── build_venv.sh
 │       ├── build_venv_frontera.sh
 │       ├── module.sh
@@ -506,7 +514,8 @@ Phase 3: Configuration Organization
 3. **gns/config.py** - Step 3
 4. **gns/training.py** - Step 5
 5. **gns/rollout.py** - Step 5
-6. **scripts/README.md** - Step 6
+6. **gns/render.py** - Step 5
+7. **scripts/README.md** - Step 6
 
 ## Validation Strategy
 
@@ -560,6 +569,7 @@ After completing all 7 steps, the following should be achieved:
 1. ✅ **Environment definitions unified in `pyproject.toml`** (Step 0)
    - Latest Python 3.13 environment managed by uv
    - pyright-lsp works properly, type checking and code completion available
+   - Deleted old environment definition files (`requirements.txt`, `enviornment.yml`)
 
 2. ✅ **Shell scripts archived in `scripts/legacy/`** (Step 6)
    - Old scripts moved to legacy folder

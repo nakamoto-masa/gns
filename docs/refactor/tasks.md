@@ -6,10 +6,10 @@
 
 - [x] Phase 0: 環境構築 (4/4) ✅
 - [x] Phase 1: アーキテクチャ分離 (13/13) ✅
-- [ ] Phase 2: モジュール/スクリプト明確化 (5/9)
+- [x] Phase 2: モジュール/スクリプト明確化 (9/9) ✅
 - [x] Phase 3: 設定の整理 (3/3) ✅ (Step 5で実装済み)
 
-**全体進捗: 25/29 タスク完了**
+**全体進捗: 29/29 タスク完了 🎉**
 
 ---
 
@@ -328,38 +328,41 @@ from gns.render import render_gif_animation; print('Import successful')"
 - rollout成功: rollout_ex0.pkl, rollout_ex1.pkl生成確認
 - インポートテスト成功
 
-### Step 6.1: scripts/legacy/ ディレクトリの作成
-- [ ] `scripts/legacy/` ディレクトリの作成
+### Step 6.1: scripts/legacy/ ディレクトリの作成 ✅
+- [x] `scripts/legacy/` ディレクトリの作成
 
 **成果物:**
 - `scripts/legacy/` ディレクトリ
 
-### Step 6.2: シェルスクリプト5ファイルを scripts/legacy/ へ移動
-- [ ] `build_venv.sh` → `scripts/legacy/build_venv.sh`
-- [ ] `build_venv_frontera.sh` → `scripts/legacy/build_venv_frontera.sh`
-- [ ] `module.sh` → `scripts/legacy/module.sh`
-- [ ] `start_venv.sh` → `scripts/legacy/start_venv.sh`
-- [ ] `run.sh` → `scripts/legacy/run.sh`
+### Step 6.2: シェルスクリプト5ファイルを scripts/legacy/ へ移動 ✅
+- [x] `build_venv.sh` → `scripts/legacy/build_venv.sh`
+- [x] `build_venv_frontera.sh` → `scripts/legacy/build_venv_frontera.sh`
+- [x] `module.sh` → `scripts/legacy/module.sh`
+- [x] `start_venv.sh` → `scripts/legacy/start_venv.sh`
+- [x] `run.sh` → `scripts/legacy/run.sh`
 
 **成果物:**
 - 5つのシェルスクリプトが `scripts/legacy/` に移動
 
-### Step 6.3: scripts/README.md の作成
-- [ ] `scripts/README.md` の作成
+### Step 6.3: scripts/README.md の作成 ✅
+- [x] `scripts/README.md` の作成
   - 新しいスクリプト（`gns_train.py` など）の説明
   - `legacy/` フォルダの説明
 
 **成果物:**
-- `scripts/README.md`
+- `scripts/README.md` - スクリプトの使用方法、アーキテクチャ説明、レガシーファイルの注意事項を含む包括的なドキュメント
 
-### Step 6.4: ファイル移動の確認
-- [ ] `scripts/legacy/` 内のファイル確認
-- [ ] ルートディレクトリがクリーンであることを確認
+### Step 6.4: ファイル移動の確認 ✅
+- [x] `scripts/legacy/` 内のファイル確認 - 5ファイルすべて移動完了
+- [x] ルートディレクトリがクリーンであることを確認 - .shファイルなし
 
-**検証コマンド:**
+**検証結果:**
 ```bash
-ls scripts/legacy/
-ls *.sh 2>/dev/null || echo "ルートディレクトリにシェルスクリプトなし（正常）"
+# Legacy scripts: 5 files confirmed
+build_venv.sh, build_venv_frontera.sh, module.sh, run.sh, start_venv.sh
+
+# Root directory: No shell scripts (correct)
+✓ ルートディレクトリはクリーン
 ```
 
 ---
@@ -422,6 +425,8 @@ uv run python scripts/gns_train.py --data_path=example/WaterDropSample/ \
 
 2. ✅ **不要なシェルスクリプトが `scripts/legacy/` に退避**（Step 6）
    - ルートディレクトリがクリーンになり、重要なファイルが明確
+   - 5つのレガシースクリプトが `scripts/legacy/` に移動
+   - `scripts/README.md` でスクリプトの使用方法とアーキテクチャを説明
 
 3. ✅ **`gns/` パッケージが再利用可能なモジュールのみを含む**（Step 5）
    - 実行スクリプトは `scripts/` に移動（`gns_train.py` など）

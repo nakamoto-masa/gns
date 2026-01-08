@@ -5,11 +5,11 @@
 ## 進捗状況
 
 - [x] Phase 0: 環境構築 (4/4) ✅
-- [ ] Phase 1: アーキテクチャ分離 (6/13)
+- [ ] Phase 1: アーキテクチャ分離 (9/13)
 - [ ] Phase 2: モジュール/スクリプト明確化 (0/9)
 - [ ] Phase 3: 設定の整理 (0/3)
 
-**全体進捗: 10/29 タスク完了**
+**全体進捗: 13/29 タスク完了**
 
 ---
 
@@ -165,33 +165,47 @@ uv run python -m gns.train --data_path=example/WaterDropSample/ \
 - `docs/refactor/decisions/0001-keep-learned-simulator-as-nn-module.md`
 - `docs/refactor/decisions/0002-type-annotation-fixes.md`
 
-### Step 3.1: gns/config.py の作成（SimulatorConfig dataclass）
-- [ ] `gns/config.py` の作成
-- [ ] `SimulatorConfig` dataclass の実装
-- [ ] `from_metadata()` クラスメソッドの実装
+### Step 3.1: gns/config.py の作成（SimulatorConfig dataclass） ✅
+- [x] `gns/config.py` の作成
+- [x] `SimulatorConfig` dataclass の実装
+- [x] `from_metadata()` クラスメソッドの実装
 
 **成果物:**
-- `gns/config.py`
+- `gns/config.py` - SimulatorConfigデータクラス
+  - デフォルト値: `input_sequence_length=6`, `num_particle_types=9`, `kinematic_particle_id=3`
+  - メタデータフィールド: `dim`, `dt`, `default_connectivity_radius`, `bounds`, etc.
+  - `from_metadata()` クラスメソッドでメタデータから設定を生成
 
-### Step 3.2: gns/train.py と train_multinode.py のグローバル定数を削除し config 引数に置き換え
-- [ ] `gns/train.py` のグローバル定数（52-54行）を削除
-- [ ] `gns/train_multinode.py` のグローバル定数を削除
-- [ ] 各関数で `config` を引数として受け取るように修正
+### Step 3.2: gns/train.py と train_multinode.py のグローバル定数を削除し config 引数に置き換え ✅
+- [x] `gns/train.py` のグローバル定数（53-55行）を削除
+- [x] `gns/train_multinode.py` のグローバル定数（61-63行）を削除
+- [x] 各関数で `simulator_config` を引数として受け取るように修正
 
 **影響範囲:**
-- `gns/train.py`, `gns/train_multinode.py` の定数参照箇所すべて
+- `gns/train.py` の修正箇所:
+  - `rollout()`, `predict()`, `train()`, `_get_simulator()`, `validation()` 関数
+  - すべての `INPUT_SEQUENCE_LENGTH`, `NUM_PARTICLE_TYPES`, `KINEMATIC_PARTICLE_ID` 参照
+- `gns/train_multinode.py` の修正箇所:
+  - `rollout()`, `rollout_par()`, `predict()`, `predict_par()`, `train()`, `_get_simulator()` 関数
+  - すべての定数参照
 
-### Step 3.3: 学習実行で検証
-- [ ] 設定オブジェクトの作成確認
-- [ ] 学習実行で検証
+### Step 3.3: 学習実行で検証 ✅
+- [x] 設定オブジェクトの作成確認 - 成功
+- [x] 10ステップ学習実行 - 成功（loss: 2.14 → 1.88）
+- [x] rollout実行 - 成功（平均loss: 0.538）
+- [x] 出力ファイル生成確認 - rollout_ex0.pkl, rollout_ex1.pkl生成確認
 
 **検証コマンド:**
 ```bash
-python -c "from gns.config import SimulatorConfig; \
+uv run python -c "from gns.config import SimulatorConfig; \
 cfg = SimulatorConfig(); print(cfg)"
 
-python -m gns.train --data_path=example/WaterDropSample/ \
-  --model_path=models/test/ --ntraining_steps=10 --mode=train
+uv run python -m gns.train --data_path=example/WaterDropSample/ \
+  --model_path=models/test_step3/ --ntraining_steps=10 --mode=train
+
+uv run python -m gns.train --data_path=example/WaterDropSample/ \
+  --model_path=models/test_step3/ --model_file=model-10.pt \
+  --mode=rollout --output_path=rollouts/test_step3/
 ```
 
 ### Step 4.1: gns/config.py に build_normalization_stats と infer_feature_dimensions 関数追加

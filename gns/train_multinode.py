@@ -20,6 +20,7 @@ from gns import noise_utils
 from gns import reading_utils
 from gns import data_loader
 from gns import inference_utils
+from gns import config
 import torch
 import torch.distributed as dist
 import torchvision.models as models
@@ -58,10 +59,6 @@ if 'LOCAL_RANK' in os.environ:
 
 Stats = collections.namedtuple('Stats', ['mean', 'std'])
 
-INPUT_SEQUENCE_LENGTH = 6  # So we can calculate the last 5 velocities.
-NUM_PARTICLE_TYPES = 9
-KINEMATIC_PARTICLE_ID = 3
-
 def rollout(
         simulator: learned_simulator.LearnedSimulator,
         position: torch.tensor,
@@ -69,6 +66,7 @@ def rollout(
         material_property: torch.tensor,
         n_particles_per_example: torch.tensor,
         nsteps: int,
+        simulator_config: config.SimulatorConfig,
         device: torch.device):
   """
   Rolls out a trajectory by applying the model in sequence.
@@ -80,6 +78,7 @@ def rollout(
     material_property: Friction angle normalized by tan() with shape (nparticles)
     n_particles_per_example
     nsteps: Number of steps.
+    simulator_config: Simulator configuration.
     device: torch device.
   """
 
@@ -90,8 +89,8 @@ def rollout(
       material_property=material_property,
       n_particles_per_example=n_particles_per_example,
       nsteps=nsteps,
-      input_sequence_length=INPUT_SEQUENCE_LENGTH,
-      kinematic_particle_id=KINEMATIC_PARTICLE_ID,
+      input_sequence_length=simulator_config.input_sequence_length,
+      kinematic_particle_id=simulator_config.kinematic_particle_id,
       device=device
   )
 
@@ -103,6 +102,7 @@ def rollout_par(
         material_property: torch.tensor,
         n_particles_per_example: torch.tensor,
         nsteps: int,
+        simulator_config: config.SimulatorConfig,
         device):
   """
   Rolls out a trajectory by applying the model in sequence.
@@ -114,11 +114,12 @@ def rollout_par(
     material_property: Friction angle normalized by tan() with shape (nparticles)
     n_particles_per_example
     nsteps: Number of steps.
+    simulator_config: Simulator configuration.
     device: torch device.
   """
 
-  initial_positions = position[:, :INPUT_SEQUENCE_LENGTH]
-  ground_truth_positions = position[:, INPUT_SEQUENCE_LENGTH:]
+  initial_positions = position[:, :simulator_config.input_sequence_length]
+  ground_truth_positions = position[:, simulator_config.input_sequence_length:]
 
   current_positions = initial_positions
   predictions = []
@@ -133,7 +134,7 @@ def rollout_par(
     )
 
     # Update kinematic particles from prescribed trajectory.
-    kinematic_mask = (particle_types == KINEMATIC_PARTICLE_ID).clone().detach().to(device)
+    kinematic_mask = (particle_types == simulator_config.kinematic_particle_id).clone().detach().to(device)
     next_position_ground_truth = ground_truth_positions[:, step]
     kinematic_mask = kinematic_mask.bool()[:, None].expand(-1, current_positions.shape[-1])
     next_position = torch.where(
@@ -170,7 +171,8 @@ def predict(device: str):
   """
   # Read metadata
   metadata = reading_utils.read_metadata(FLAGS.data_path, "rollout")
-  simulator = _get_simulator(metadata, FLAGS.noise_std, FLAGS.noise_std, device)
+  simulator_config = config.SimulatorConfig.from_metadata(metadata)
+  simulator = _get_simulator(metadata, FLAGS.noise_std, FLAGS.noise_std, simulator_config, device)
 
   # Load simulator
   if os.path.exists(FLAGS.model_path + FLAGS.model_file):
@@ -205,11 +207,11 @@ def predict(device: str):
       positions = features[0].to(device)
       if metadata['sequence_length'] is not None:
         # If `sequence_length` is predefined in metadata,
-        nsteps = metadata['sequence_length'] - INPUT_SEQUENCE_LENGTH
+        nsteps = metadata['sequence_length'] - simulator_config.input_sequence_length
       else:
         # If no predefined `sequence_length`, then get the sequence length
         sequence_length = positions.shape[1]
-        nsteps = sequence_length - INPUT_SEQUENCE_LENGTH
+        nsteps = sequence_length - simulator_config.input_sequence_length
       particle_type = features[1].to(device)
       if material_property_as_feature:
         material_property = features[2].to(device)
@@ -225,6 +227,7 @@ def predict(device: str):
                                       material_property,
                                       n_particles_per_example,
                                       nsteps,
+                                      simulator_config,
                                       device)
 
       example_rollout['metadata'] = metadata
@@ -252,7 +255,8 @@ def predict_par(rank):
   """
   # Read metadata
   metadata = reading_utils.read_metadata(FLAGS.data_path, "rollout")
-  serial_simulator = _get_simulator(metadata, FLAGS.noise_std, FLAGS.noise_std, rank)
+  simulator_config = config.SimulatorConfig.from_metadata(metadata)
+  serial_simulator = _get_simulator(metadata, FLAGS.noise_std, FLAGS.noise_std, simulator_config, rank)
   serial_simulator = serial_simulator.to('cuda')
   device_id = rank
   simulator = DDP(serial_simulator, device_ids=[rank])
@@ -294,11 +298,11 @@ def predict_par(rank):
       positions = features[0].to(rank)
       if metadata['sequence_length'] is not None:
         # If `sequence_length` is predefined in metadata,
-        nsteps = metadata['sequence_length'] - INPUT_SEQUENCE_LENGTH
+        nsteps = metadata['sequence_length'] - simulator_config.input_sequence_length
       else:
         # If no predefined `sequence_length`, then get the sequence length
         sequence_length = positions.shape[1]
-        nsteps = sequence_length - INPUT_SEQUENCE_LENGTH
+        nsteps = sequence_length - simulator_config.input_sequence_length
       particle_type = features[1].to(rank)
       if material_property_as_feature:
         material_property = features[2].to(rank)
@@ -314,6 +318,7 @@ def predict_par(rank):
                                       material_property,
                                       n_particles_per_example,
                                       nsteps,
+                                      simulator_config,
                                       rank)
 
       example_rollout['metadata'] = metadata
@@ -357,9 +362,10 @@ def train(rank, flags, world_size, verbose):
   # """
   # Read metadata
   metadata = reading_utils.read_metadata(flags["data_path"], "train")
+  simulator_config = config.SimulatorConfig.from_metadata(metadata)
 
   # Get simulator and optimizer
-  serial_simulator = _get_simulator(metadata, flags["noise_std"], flags["noise_std"], rank)
+  serial_simulator = _get_simulator(metadata, flags["noise_std"], flags["noise_std"], simulator_config, rank)
   serial_simulator = serial_simulator.to('cuda')
   device_id = rank
   simulator = DDP(serial_simulator, device_ids=[rank])
@@ -404,10 +410,10 @@ def train(rank, flags, world_size, verbose):
   simulator.to(device_id)
 
   # dl = distribute.get_data_distributed_dataloader_by_samples(path=f'{flags["data_path"]}train.npz',
-  #                                                             input_length_sequence=INPUT_SEQUENCE_LENGTH,
+  #                                                             input_length_sequence=simulator_config.input_sequence_length,
   #                                                             batch_size=flags["batch_size"])
   path=f'{flags["data_path"]}train.npz'
-  input_length_sequence=INPUT_SEQUENCE_LENGTH
+  input_length_sequence=simulator_config.input_sequence_length
   batch_size=flags["batch_size"]
   dataset = data_loader.SamplesDataset(path, input_length_sequence)
   # for multi node training we need to use pytorch's distributed sampler, see https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler
@@ -439,7 +445,7 @@ def train(rank, flags, world_size, verbose):
         # TODO (jpv): Move noise addition to data_loader
         # Sample the noise to add to the inputs to the model during training.
         sampled_noise = noise_utils.get_random_walk_noise_for_position_sequence(position, noise_std_last_step=flags["noise_std"]).to(device_id)
-        non_kinematic_mask = (particle_type != KINEMATIC_PARTICLE_ID).clone().detach().to(device_id)
+        non_kinematic_mask = (particle_type != simulator_config.kinematic_particle_id).clone().detach().to(device_id)
         sampled_noise *= non_kinematic_mask.view(-1, 1, 1)
 
         # Get the predictions and target accelerations.
@@ -506,6 +512,7 @@ def _get_simulator(
         metadata: json,
         acc_noise_std: float,
         vel_noise_std: float,
+        simulator_config: config.SimulatorConfig,
         device: torch.device) -> learned_simulator.LearnedSimulator:
   """Instantiates the simulator.
 
@@ -513,6 +520,7 @@ def _get_simulator(
     metadata: JSON object with metadata.
     acc_noise_std: Acceleration noise std deviation.
     vel_noise_std: Velocity noise std deviation.
+    simulator_config: Simulator configuration.
     device: PyTorch device 'cpu' or 'cuda'.
   """
 
@@ -552,7 +560,7 @@ def _get_simulator(
       connectivity_radius=metadata['default_connectivity_radius'],
       boundaries=np.array(metadata['bounds']),
       normalization_stats=normalization_stats,
-      nparticle_types=NUM_PARTICLE_TYPES,
+      nparticle_types=simulator_config.num_particle_types,
       particle_type_embedding_size=16,
       boundary_clamp_limit=metadata["boundary_augment"] if "boundary_augment" in metadata else 1.0,
       device=device)

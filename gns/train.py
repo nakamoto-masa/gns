@@ -21,6 +21,7 @@ from gns import reading_utils
 from gns import data_loader
 from gns import distribute
 from gns import inference_utils
+from gns import config
 
 flags.DEFINE_enum(
     'mode', 'train', ['train', 'valid', 'rollout'],
@@ -50,10 +51,6 @@ FLAGS = flags.FLAGS
 
 Stats = collections.namedtuple('Stats', ['mean', 'std'])
 
-INPUT_SEQUENCE_LENGTH = 6  # So we can calculate the last 5 velocities.
-NUM_PARTICLE_TYPES = 9
-KINEMATIC_PARTICLE_ID = 3
-
 def rollout(
         simulator: learned_simulator.LearnedSimulator,
         position: torch.tensor,
@@ -61,6 +58,7 @@ def rollout(
         material_property: torch.tensor,
         n_particles_per_example: torch.tensor,
         nsteps: int,
+        simulator_config: config.SimulatorConfig,
         device: torch.device):
   """
   Rolls out a trajectory by applying the model in sequence.
@@ -72,6 +70,7 @@ def rollout(
     material_property: Friction angle normalized by tan() with shape (nparticles)
     n_particles_per_example
     nsteps: Number of steps.
+    simulator_config: Simulator configuration.
     device: torch device.
   """
 
@@ -82,8 +81,8 @@ def rollout(
       material_property=material_property,
       n_particles_per_example=n_particles_per_example,
       nsteps=nsteps,
-      input_sequence_length=INPUT_SEQUENCE_LENGTH,
-      kinematic_particle_id=KINEMATIC_PARTICLE_ID,
+      input_sequence_length=simulator_config.input_sequence_length,
+      kinematic_particle_id=simulator_config.kinematic_particle_id,
       device=device
   )
 
@@ -97,7 +96,8 @@ def predict(device: str):
   """
   # Read metadata
   metadata = reading_utils.read_metadata(FLAGS.data_path, "rollout")
-  simulator = _get_simulator(metadata, FLAGS.noise_std, FLAGS.noise_std, device)
+  simulator_config = config.SimulatorConfig.from_metadata(metadata)
+  simulator = _get_simulator(metadata, FLAGS.noise_std, FLAGS.noise_std, simulator_config, device)
 
   # Load simulator
   if os.path.exists(FLAGS.model_path + FLAGS.model_file):
@@ -132,11 +132,11 @@ def predict(device: str):
       positions = features[0].to(device)
       if metadata['sequence_length'] is not None:
         # If `sequence_length` is predefined in metadata,
-        nsteps = metadata['sequence_length'] - INPUT_SEQUENCE_LENGTH
+        nsteps = metadata['sequence_length'] - simulator_config.input_sequence_length
       else:
         # If no predefined `sequence_length`, then get the sequence length
         sequence_length = positions.shape[1]
-        nsteps = sequence_length - INPUT_SEQUENCE_LENGTH
+        nsteps = sequence_length - simulator_config.input_sequence_length
       particle_type = features[1].to(device)
       if material_property_as_feature:
         material_property = features[2].to(device)
@@ -152,6 +152,7 @@ def predict(device: str):
                                       material_property,
                                       n_particles_per_example,
                                       nsteps,
+                                      simulator_config,
                                       device)
 
       example_rollout['metadata'] = metadata
@@ -252,14 +253,15 @@ def train(rank, flags, world_size, device):
 
   # Read metadata
   metadata = reading_utils.read_metadata(flags["data_path"], "train")
+  simulator_config = config.SimulatorConfig.from_metadata(metadata)
 
   # Get simulator and optimizer
   if device == torch.device("cuda"):
-    serial_simulator = _get_simulator(metadata, flags["noise_std"], flags["noise_std"], rank)
+    serial_simulator = _get_simulator(metadata, flags["noise_std"], flags["noise_std"], simulator_config, rank)
     simulator = DDP(serial_simulator.to(rank), device_ids=[rank], output_device=rank)
     optimizer = torch.optim.Adam(simulator.parameters(), lr=flags["lr_init"]*world_size)
   else:
-    simulator = _get_simulator(metadata, flags["noise_std"], flags["noise_std"], device)
+    simulator = _get_simulator(metadata, flags["noise_std"], flags["noise_std"], simulator_config, device)
     optimizer = torch.optim.Adam(simulator.parameters(), lr=flags["lr_init"] * world_size)
 
   # Initialize training state
@@ -329,7 +331,7 @@ def train(rank, flags, world_size, device):
   # Load training data
   dl = get_data_loader(
       path=f'{flags["data_path"]}train.npz',
-      input_length_sequence=INPUT_SEQUENCE_LENGTH,
+      input_length_sequence=simulator_config.input_sequence_length,
       batch_size=flags["batch_size"],
   )
   n_features = len(dl.dataset._data[0])
@@ -338,7 +340,7 @@ def train(rank, flags, world_size, device):
   if flags["validation_interval"] is not None:
       dl_valid = get_data_loader(
           path=f'{flags["data_path"]}valid.npz',
-          input_length_sequence=INPUT_SEQUENCE_LENGTH,
+          input_length_sequence=simulator_config.input_sequence_length,
           batch_size=flags["batch_size"],
       )
       if len(dl_valid.dataset._data[0]) != n_features:
@@ -373,7 +375,7 @@ def train(rank, flags, world_size, device):
         # TODO (jpv): Move noise addition to data_loader
         # Sample the noise to add to the inputs to the model during training.
         sampled_noise = noise_utils.get_random_walk_noise_for_position_sequence(position, noise_std_last_step=flags["noise_std"]).to(device_id)
-        non_kinematic_mask = (particle_type != KINEMATIC_PARTICLE_ID).clone().detach().to(device_id)
+        non_kinematic_mask = (particle_type != simulator_config.kinematic_particle_id).clone().detach().to(device_id)
         sampled_noise *= non_kinematic_mask.view(-1, 1, 1)
 
         # Get the predictions and target accelerations
@@ -392,7 +394,7 @@ def train(rank, flags, world_size, device):
           sampled_valid_example = next(iter(dl_valid))
           if step > 0 and step % flags["validation_interval"] == 0:
               valid_loss = validation(
-                simulator, sampled_valid_example, n_features, flags, rank, device_id)
+                simulator, sampled_valid_example, n_features, flags, simulator_config, rank, device_id)
               print(f"Validation loss at {step}: {valid_loss.item()}")
 
         # Calculate the loss and mask out loss on kinematic particles
@@ -437,7 +439,7 @@ def train(rank, flags, world_size, device):
       if flags["validation_interval"] is not None:
         sampled_valid_example = next(iter(dl_valid))
         epoch_valid_loss = validation(
-                simulator, sampled_valid_example, n_features, flags, rank, device_id)
+                simulator, sampled_valid_example, n_features, flags, simulator_config, rank, device_id)
         if device == torch.device("cuda"):
           torch.distributed.reduce(epoch_valid_loss, dst=0, op=torch.distributed.ReduceOp.SUM)
           epoch_valid_loss /= world_size
@@ -473,6 +475,7 @@ def _get_simulator(
         metadata: json,
         acc_noise_std: float,
         vel_noise_std: float,
+        simulator_config: config.SimulatorConfig,
         device: torch.device) -> learned_simulator.LearnedSimulator:
   """Instantiates the simulator.
 
@@ -480,6 +483,7 @@ def _get_simulator(
     metadata: JSON object with metadata.
     acc_noise_std: Acceleration noise std deviation.
     vel_noise_std: Velocity noise std deviation.
+    simulator_config: Simulator configuration.
     device: PyTorch device 'cpu' or 'cuda'.
   """
 
@@ -519,7 +523,7 @@ def _get_simulator(
       connectivity_radius=metadata['default_connectivity_radius'],
       boundaries=np.array(metadata['bounds']),
       normalization_stats=normalization_stats,
-      nparticle_types=NUM_PARTICLE_TYPES,
+      nparticle_types=simulator_config.num_particle_types,
       particle_type_embedding_size=16,
       boundary_clamp_limit=metadata["boundary_augment"] if "boundary_augment" in metadata else 1.0,
       device=device)
@@ -531,6 +535,7 @@ def validation(
         example,
         n_features,
         flags,
+        simulator_config,
         rank,
         device_id):
 
@@ -548,7 +553,7 @@ def validation(
   # Sample the noise to add to the inputs.
   sampled_noise = noise_utils.get_random_walk_noise_for_position_sequence(
     position, noise_std_last_step=flags["noise_std"]).to(device_id)
-  non_kinematic_mask = (particle_type != KINEMATIC_PARTICLE_ID).clone().detach().to(device_id)
+  non_kinematic_mask = (particle_type != simulator_config.kinematic_particle_id).clone().detach().to(device_id)
   sampled_noise *= non_kinematic_mask.view(-1, 1, 1)
 
   # Do evaluation for the validation data

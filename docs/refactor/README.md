@@ -1,29 +1,28 @@
-# Refactoring Policy
+# Refactoring Documentation
 
-## Purpose
+This directory contains documentation related to the refactoring of the GNS model.
 
-The purpose is to make the model easier to use for users.
-Since there are no plans to modify the model itself, design changes considering maintainability will not be made.
+## Overview Documents
 
-## Scope
+- [refactoring-policy.md](refactoring-policy.md) - Refactoring policy and purpose
+- [initial-issues.md](initial-issues.md) - Issues before refactoring
+- [equivalence-testing-overview.md](equivalence-testing-overview.md) - Equivalence testing overview
+- [CLAUDE.md](CLAUDE.md) - Instructions for Claude
 
-The scope covers code quality issues in the GNS model.
-The issues described in initial-issues.md serve as the starting point.
+## Planning Documents
 
-- This repository contains two types of models: GNS and MeshNet
-- MeshNet is out of scope for this refactoring
+- [plan.md](plan.md) / [plan.ja.md](plan.ja.md) - Detailed refactoring plan
+- [equivalence-testing-plan.md](equivalence-testing-plan.md) - Equivalence testing plan
+- [structure-migration.md](structure-migration.md) - Directory structure migration plan
+- [tasks.md](tasks.md) - Task list
 
-## User-Facing Issues Before Refactoring
+## Subdirectories
 
-- Environment definitions are written in multiple files with inconsistent content
-- Shell scripts with unclear purpose scattered in the repository root
-- Ambiguous distinction between modules and scripts
-- Difficult to extract and use only specific features
+- [decisions/](decisions/) - Design decision records
+- [reports/](reports/) - Test results and work reports
 
-## Refactoring Approach
+## How to Read These Documents
 
-- Do not change algorithm behavior
-- Reorganize existing code with the following perspectives
-  - Separation by responsibility
-  - Clear distinction between modules and scripts
-- Make changes incrementally, maintaining functionality at each stage
+1. Start with [refactoring-policy.md](refactoring-policy.md) to understand the purpose and policy
+2. Read [plan.md](plan.md) for specific work details
+3. Refer to individual documents as needed

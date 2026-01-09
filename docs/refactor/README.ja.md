@@ -1,29 +1,28 @@
-# リファクタリングの方針
+# リファクタリングドキュメント
 
-## 目的
+このディレクトリには、GNSモデルのリファクタリングに関するドキュメントが含まれています。
 
-利用者としてモデルを使いやすくすることが目的。
-モデルそのものを改造する予定はないため、保守性までを考慮した設計変更は不要。
+## 概要ドキュメント
 
-## 対象
+- [refactoring-policy.ja.md](refactoring-policy.ja.md) - リファクタリングの方針と目的
+- [initial-issues.ja.md](initial-issues.ja.md) - リファクタリング開始前の課題
+- [equivalence-testing-overview.md](equivalence-testing-overview.md) - 等価性テストの概要
+- [CLAUDE.md](CLAUDE.md) - Claude向けの作業指示
 
-GNSモデルのコード品質上の問題点を対象とする。
-initial-issues.mdに書かれた問題点を出発点とする。
+## 計画ドキュメント
 
-- このリポジトリにはGNSとMeshNetの２種類のモデルがある
-- MeshNetはリファクタリングの対象外とする
+- [plan.ja.md](plan.ja.md) / [plan.md](plan.md) - リファクタリングの詳細計画
+- [equivalence-testing-plan.md](equivalence-testing-plan.md) - 等価性テスト計画
+- [structure-migration.md](structure-migration.md) - ディレクトリ構造の移行計画
+- [tasks.md](tasks.md) - タスク一覧
 
-## リファクタリング開始前の利用上の課題
+## サブディレクトリ
 
-- 環境定義が複数のファイルに書かれていて、内容が一致していない
-- 位置付けの不明なシェルスクリプトがリポジトリルートに散在
-- モジュールとスクリプトの区別があいまい
-- 一部の機能だけを抜き出して使うのが難しい
+- [decisions/](decisions/) - 設計判断の記録
+- [reports/](reports/) - テスト結果や作業報告
 
-## リファクタリングの進め方
+## ドキュメントの読み方
 
-- アルゴリズムの挙動は変更しない
-- 既存コードを以下の観点で整理する
-  - 責務ごとの分離
-  - モジュールとスクリプトの明確化
-- 変更は段階的に行い、各段階で動作を維持する
+1. まず[refactoring-policy.ja.md](refactoring-policy.ja.md)でリファクタリングの目的と方針を確認
+2. [plan.ja.md](plan.ja.md)で具体的な作業内容を確認
+3. 必要に応じて個別のドキュメントを参照

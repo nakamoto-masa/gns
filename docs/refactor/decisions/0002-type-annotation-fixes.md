@@ -1,8 +1,13 @@
 # Decision 0002: Type Annotation Fixes
 
 **Date**: 2026-01-08
-**Status**: Accepted
+**Status**: ~~Accepted~~ **PARTIALLY SUPERSEDED by Decision 0004**
 **Decision Makers**: Development Team
+
+---
+**⚠️ NOTICE**: Step 2 was reverted on 2026-01-09 by [Decision 0004: Revert Step 2 Architecture Separation](0004-revert-step2-architecture-separation.ja.md). However, the type annotation improvements (modern syntax, proper capitalization) were preserved during the revert. This document is kept for historical reference.
+
+---
 
 ## Context
 

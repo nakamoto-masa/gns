@@ -1,8 +1,13 @@
 # Decision 0001: Keep LearnedSimulator as nn.Module
 
 **Date**: 2026-01-08
-**Status**: Accepted
+**Status**: ~~Accepted~~ **SUPERSEDED by Decision 0004**
 **Decision Makers**: Development Team
+
+---
+**⚠️ NOTICE**: This decision was superseded on 2026-01-09 by [Decision 0004: Revert Step 2 Architecture Separation](0004-revert-step2-architecture-separation.ja.md). Step 2 was reverted due to state_dict incompatibility issues. This document is kept for historical reference only.
+
+---
 
 ## Context
 

@@ -367,7 +367,8 @@ def test_rollout_equivalence():
     """
 
     # Load reference rollout (generated with OLD code)
-    with open("test_data/old_results/rollout/rollout_0.pkl", "rb") as f:
+    # Note: Old code saves as "rollout_ex0.pkl" (output_filename + "_ex" + example_number)
+    with open("test_data/old_results/rollout/rollout_ex0.pkl", "rb") as f:
         reference_data = pickle.load(f)
 
     reference_rollout = reference_data['predicted_rollout']
@@ -396,14 +397,28 @@ def test_rollout_equivalence():
     particle_type_tensor = torch.tensor(particle_types, dtype=torch.long)
     n_particles = torch.tensor([initial_positions.shape[1]])
 
+    # Material property (if exists in reference data, otherwise zeros)
+    if 'material_property' in reference_data:
+        material_property = torch.tensor(
+            reference_data['material_property'],
+            dtype=torch.float32
+        )
+    else:
+        # Default: zeros for all particles
+        material_property = torch.zeros(initial_positions.shape[1], dtype=torch.float32)
+
     # Run rollout with NEW code
+    device = torch.device('cpu')
     with torch.no_grad():
-        predicted_rollout = rollout.rollout(
+        _, predicted_rollout = rollout.rollout(
             simulator=simulator,
-            position_sequence=position_seq,
+            position=position_seq,
             particle_types=particle_type_tensor,
+            material_property=material_property,
             n_particles_per_example=n_particles,
-            nsteps=reference_rollout.shape[0]
+            nsteps=reference_rollout.shape[0],
+            simulator_config=simulator_config,
+            device=device
         )
 
     predicted_np = predicted_rollout.cpu().numpy()
@@ -732,58 +747,36 @@ ln -s /path/to/WaterDropSample test_data/WaterDropSample
 
 リファクタリング前のコード (`main/`) で参照データを生成：
 
+**重要**: 旧コードは `absl.app` を使用しているため、Pythonスクリプトから直接呼び出すのではなく、CLIとして実行します。
+
 ```bash
 cd equivalence-tests
 
-# Create reference generation script
-cat > generate_old_results.py << 'EOF'
-"""Generate reference data using old code from main worktree"""
-import sys
-sys.path.insert(0, '../main')
+# Train a small model with OLD code (10 steps for testing)
+python ../main/gns/train.py \
+  --mode=train \
+  --data_path=test_data/WaterDropSample \
+  --model_path=test_data/old_results/model \
+  --ntraining_steps=10
 
-import torch
-import numpy as np
-import pickle
-
-# Import from OLD code
-from gns import train as old_train
-
-def generate_reference_rollout():
-    """Train a small model and generate reference rollout with OLD code"""
-
-    # Train model (10 steps)
-    print("Training model with OLD code...")
-    old_train.main([
-        '--mode=train',
-        '--data_path=test_data/WaterDropSample',
-        '--model_path=test_data/old_results/model',
-        '--ntraining_steps=10'
-    ])
-
-    # Generate rollout
-    print("Generating rollout with OLD code...")
-    old_train.main([
-        '--mode=rollout',
-        '--data_path=test_data/WaterDropSample',
-        '--model_path=test_data/old_results/model',
-        '--model_file=model-10.pt',
-        '--output_path=test_data/old_results/rollout',
-        '--num_rollouts=1'
-    ])
-
-    print("✓ Reference data generated in test_data/old_results/")
-
-if __name__ == "__main__":
-    generate_reference_rollout()
-EOF
-
-# Run it
-python generate_old_results.py
+# Generate reference rollout with OLD code
+python ../main/gns/train.py \
+  --mode=rollout \
+  --data_path=test_data/WaterDropSample \
+  --model_path=test_data/old_results/model \
+  --model_file=model-10.pt \
+  --output_path=test_data/old_results/rollout \
+  --num_rollouts=1
 ```
 
 生成されるファイル:
 - `test_data/old_results/model/model-10.pt` - 旧コードで訓練したチェックポイント
-- `test_data/old_results/rollout/rollout_0.pkl` - 旧コードで生成したロールアウト
+- `test_data/old_results/rollout/rollout_ex0.pkl` - 旧コードで生成したロールアウト (example 0)
+
+**注意**: 旧コードはabslを使用しているため、環境に`absl-py`がインストールされている必要があります:
+```bash
+pip install absl-py
+```
 
 ### Step 5: Run Equivalence Test
 

@@ -70,9 +70,11 @@ def test_config_validation():
         )
 ```
 
-#### 1.2 Model Architecture (`gns/learned_simulator.py`, `gns/graph_model.py`)
+#### 1.2 Model Architecture (`gns/learned_simulator.py`)
 
 **目的**: モデルの前向き計算が正しく動作することを確認
+
+**注**: Step 2でのクラス分割はrevertされたため、`LearnedSimulator`のみをテストします。
 
 ```python
 # tests/test_model.py
@@ -90,27 +92,28 @@ def test_learned_simulator_forward():
     )
 
     # Forward pass
-    output = simulator(batch)
+    output = simulator.predict_positions(batch)
 
     # Verify output shape
-    assert output.shape == (2, 100, config.dim)
+    assert output.shape == (100, config.dim)
     assert not torch.isnan(output).any()
 
-def test_graph_model_consistency():
-    """Test GraphNeuralNetworkModel produces deterministic output"""
+def test_learned_simulator_deterministic():
+    """Test LearnedSimulator produces deterministic output (inference mode)"""
     config = create_test_config()
-    model = GraphNeuralNetworkModel(config)
+    simulator = LearnedSimulator(config)
+    simulator.eval()
 
     # Same input twice
     input_data = create_dummy_input()
 
     torch.manual_seed(42)
-    output1 = model(input_data)
+    output1 = simulator.predict_positions(input_data)
 
     torch.manual_seed(42)
-    output2 = model(input_data)
+    output2 = simulator.predict_positions(input_data)
 
-    # Should be identical
+    # Should be identical (inference is deterministic)
     assert torch.allclose(output1, output2)
 ```
 

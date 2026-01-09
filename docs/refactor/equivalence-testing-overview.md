@@ -1,142 +1,142 @@
-# 等価性テスト概要
+# Equivalence Testing Overview
 
-リファクタリング後のコードが元のコードと機能的に等価であることを検証する方針の概要です。
+This document outlines the strategy for verifying that refactored code is functionally equivalent to the original code.
 
-## テストの目的
+## Testing Objectives
 
-リファクタリングによってコードの構造は変更されましたが、以下が保持されていることを確認します：
+While refactoring changed the code structure, we need to confirm that the following are preserved:
 
-1. **チェックポイント互換性**: 旧コードで訓練したモデルが読み込める
-2. **推論の決定性**: 同じモデル・同じ入力で同じ予測結果が得られる
-3. **訓練の妥当性**: 訓練が正常に動作し、lossが減少する
-4. **設定の互換性**: メタデータから正しく設定が復元される
+1. **Checkpoint Compatibility**: Models trained with old code can be loaded
+2. **Inference Determinism**: Same model and input produce same predictions
+3. **Training Validity**: Training works correctly and loss decreases
+4. **Configuration Compatibility**: Configuration is correctly restored from metadata
 
-## 重要な前提：乱数制御なし
+## Important Assumption: No Random Seed Control
 
-現在のコードには乱数シード制御機能がありません。
+The current code does not have random seed control functionality.
 
-- **訓練時**: `torch.randn()`でノイズ付加 → **非決定論的**
-- **推論時（ロールアウト）**: ノイズなし → **決定論的**
+- **During Training**: Noise is added using `torch.randn()` → **Non-deterministic**
+- **During Inference (Rollout)**: No noise → **Deterministic**
 
-そのため：
-- ✅ **推論は完全一致を期待**できる
-- ❌ **訓練の厳密な再現は期待しない**（loss減少のみ確認）
+Therefore:
+- ✅ **Inference can be expected to match exactly**
+- ❌ **Exact training reproduction is not expected** (only verify loss decrease)
 
-## テスト戦略
+## Testing Strategy
 
-### テスト環境の配置
+### Test Environment Layout
 
 ```
 repos/gns/
-├── main/              # 旧コード（参照のみ）
-├── wt-cleanup/        # 新コード（参照のみ）
-└── equivalence-tests/ # ★テスト実行環境★（リポジトリ外）
+├── main/              # Old code (reference only)
+├── wt-cleanup/        # New code (reference only)
+└── equivalence-tests/ # ★ Test execution environment ★ (outside repository)
     ├── test_data/
-    │   ├── WaterDropSample/     # テストデータ
-    │   └── old_results/         # 旧コード実行結果
+    │   ├── WaterDropSample/     # Test data
+    │   └── old_results/         # Old code execution results
     └── tests/
-        └── test_equivalence.py  # テストコード
+        └── test_equivalence.py  # Test code
 ```
 
-**なぜリポジトリ外？**
-- リポジトリが汚れない（`test_data/`, `tests/`不要）
-- 新旧コードを対等に扱える
-- クリーンな環境で厳密なテスト
+**Why outside repository?**
+- Keeps repository clean (no `test_data/`, `tests/` needed)
+- Treats old and new code equally
+- Strict testing in clean environment
 
-### テストの流れ
+### Testing Flow
 
 ```mermaid
 graph LR
-    A[旧コードで<br/>モデル訓練] --> B[旧コードで<br/>ロールアウト生成]
-    B --> C[参照データ<br/>保存]
-    C --> D[新コードで<br/>チェックポイント読込]
-    D --> E[新コードで<br/>ロールアウト実行]
-    E --> F{結果比較}
-    F -->|完全一致| G[✅ PASS]
-    F -->|浮動小数点<br/>誤差程度| H[⚠️ PASS]
-    F -->|大きな差異| I[❌ FAIL]
+    A[Train model<br/>with old code] --> B[Generate rollout<br/>with old code]
+    B --> C[Save reference<br/>data]
+    C --> D[Load checkpoint<br/>with new code]
+    D --> E[Execute rollout<br/>with new code]
+    E --> F{Compare results}
+    F -->|Exact match| G[✅ PASS]
+    F -->|Floating point<br/>error range| H[⚠️ PASS]
+    F -->|Large difference| I[❌ FAIL]
 ```
 
-### 合否判定
+### Pass/Fail Criteria
 
-| 結果 | 判定 | 意味 |
-|------|------|------|
-| **完全一致** | ✅ PASS | リファクタリング成功 |
-| **浮動小数点誤差程度**<br/>(rtol=1e-6, atol=1e-7) | ⚠️ PASS | 許容範囲（演算順序の違いなど） |
-| **大きな差異** | ❌ FAIL | リファクタリングにバグあり |
+| Result | Verdict | Meaning |
+|--------|---------|---------|
+| **Exact match** | ✅ PASS | Refactoring successful |
+| **Floating point error range**<br/>(rtol=1e-6, atol=1e-7) | ⚠️ PASS | Acceptable (different operation order, etc.) |
+| **Large difference** | ❌ FAIL | Refactoring has bugs |
 
-## テストコードの要点
+## Key Points in Test Code
 
-### 1. 参照データ生成（旧コードで実行）
+### 1. Generate Reference Data (Execute with old code)
 
 ```bash
-# 旧コードで10ステップ訓練
+# Train 10 steps with old code
 python ../main/gns/train.py --mode=train --ntraining_steps=10 ...
 
-# 旧コードでロールアウト生成
+# Generate rollout with old code
 python ../main/gns/train.py --mode=rollout ...
 ```
 
-**重要**: 旧コードは`absl.app`を使用 → CLI実行のみ可能
+**Important**: Old code uses `absl.app` → CLI execution only
 
-### 2. 等価性テスト（新コードで実行）
+### 2. Equivalence Test (Execute with new code)
 
 ```python
-# 旧コードの出力を読み込み
+# Load old code output
 reference_rollout = pickle.load("old_results/rollout/rollout_ex0.pkl")
 
-# 新コードで同じチェックポイントを使ってロールアウト
+# Run rollout with new code using same checkpoint
 simulator.load_state_dict(old_checkpoint)
 predicted_rollout = rollout.rollout(simulator, ...)
 
-# 比較（決定論的推論のため完全一致期待）
+# Compare (expect exact match for deterministic inference)
 np.testing.assert_array_equal(predicted_rollout, reference_rollout)
 ```
 
-### 3. 訓練妥当性テスト（新コードのみ）
+### 3. Training Validity Test (New code only)
 
 ```python
-# 50ステップ訓練してloss減少を確認
+# Train 50 steps and verify loss decreases
 early_loss = mean(losses[:10])
 late_loss = mean(losses[-10:])
-assert late_loss < early_loss  # 減少すればOK
+assert late_loss < early_loss  # Decrease is OK
 ```
 
-**注意**: 厳密な再現性は期待しない（乱数制御なし）
+**Note**: Exact reproducibility is not expected (no random control)
 
-## 実装上の注意点
+## Implementation Notes
 
-### 旧コードの制約
+### Old Code Constraints
 
-- `absl.app`を使用 → `main()`関数を直接呼び出せない
-- CLI経由での実行が必須
+- Uses `absl.app` → Cannot call `main()` function directly
+- Must execute via CLI
 
-### 新コードのAPI
+### New Code API
 
 ```python
-# rollout関数のシグネチャ
+# rollout function signature
 _, predicted = rollout.rollout(
     simulator=simulator,
-    position=position_seq,           # 初期位置
-    particle_types=particle_types,   # 粒子タイプ
-    material_property=mat_prop,      # 材料特性
+    position=position_seq,           # Initial positions
+    particle_types=particle_types,   # Particle types
+    material_property=mat_prop,      # Material properties
     n_particles_per_example=n_particles,
     nsteps=nsteps,
-    simulator_config=config,         # 設定
+    simulator_config=config,         # Configuration
     device=device
 )
 ```
 
-### ファイル名の注意
+### Filename Notes
 
-- 旧コード: `rollout_ex0.pkl` (output_filename + "_ex" + example_i)
-- 新コード: 任意に設定可能
+- Old code: `rollout_ex0.pkl` (output_filename + "_ex" + example_i)
+- New code: Can be set arbitrarily
 
-## まとめ
+## Summary
 
-- **テスト環境**: リポジトリ外の独立した環境で実行
-- **推論テスト**: 決定論的 → 完全一致を期待
-- **訓練テスト**: 非決定論的 → loss減少のみ確認
-- **判定基準**: 明確（完全一致 or 浮動小数点誤差 or 失敗）
+- **Test Environment**: Execute in independent environment outside repository
+- **Inference Test**: Deterministic → expect exact match
+- **Training Test**: Non-deterministic → verify loss decrease only
+- **Criteria**: Clear (exact match or floating point error or failure)
 
-詳細は [equivalence-testing-plan.md](./equivalence-testing-plan.md) を参照してください。
+For details, see [equivalence-testing-plan.md](./equivalence-testing-plan.md).

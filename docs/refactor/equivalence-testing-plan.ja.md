@@ -1,47 +1,47 @@
 # Refactoring Equivalence Testing Plan
 
-This document presents a test plan to verify that refactored code is functionally equivalent to the original code.
+このドキュメントは、リファクタリング後のコードが元のコードと機能的に等価であることを検証するためのテスト計画を示します。
 
-## Purpose
+## 目的
 
-While refactoring changed the code structure, we need to confirm that the following behaviors are preserved:
+リファクタリングによってコードの構造は変更されましたが、以下の動作が保持されていることを確認します：
 
-1. **Checkpoint Compatibility**: Checkpoints from before refactoring can be loaded
-2. **Inference Determinism**: Same model and input produce same predictions (no noise during inference)
-3. **Training Validity**: Training works correctly and loss decreases
-4. **Configuration Compatibility**: Configuration is correctly restored from metadata
+1. **チェックポイント互換性**: リファクタリング前のチェックポイントが読み込める
+2. **推論の決定性**: 同じモデル・同じ入力で同じ予測結果が得られる（推論時はノイズなし）
+3. **訓練の妥当性**: 訓練が正常に動作し、lossが減少する
+4. **設定の互換性**: メタデータから正しく設定が復元される
 
-## Random Numbers
+## 乱数について
 
-**Important Assumption**: The current code does not have random seed control functionality.
+**重要な前提**: 現在のコードには乱数シード制御機能がありません。
 
-### Random Number Usage
+### 乱数の使用箇所
 
-1. **During Training**: Uses `torch.randn()` in `noise_utils.py` to add noise
-2. **During Inference (Rollout)**: **No noise** - deterministic
+1. **訓練時**: `noise_utils.py` で `torch.randn()` を使用してノイズを付加
+2. **推論時（ロールアウト）**: **ノイズなし** - 決定論的
 
-### Testing Strategy
+### テスト戦略
 
-Since random numbers during training cannot be controlled, we adopt the following strategy:
+訓練時の乱数は制御できないため、以下の戦略を取ります：
 
-#### Strategy 1: Exact Match Test for Inference (Possible)
-- Inference doesn't use noise, so it's completely deterministic
-- **Exact match** expected before and after refactoring
+#### 戦略1: 推論の完全一致テスト（可能）
+- 推論はノイズを使わないため、完全に決定論的
+- リファクタリング前後で**完全一致**を期待
 
-#### Strategy 2: Statistical Validity Test for Training (No random control)
-- Verify loss decreases during training
-- Verify multiple runs fall within statistically reasonable range
-- **Exact match before and after refactoring is not expected**
+#### 戦略2: 訓練の統計的妥当性テスト（乱数制御なし）
+- 訓練時のloss減少を確認
+- 複数回実行して統計的に妥当な範囲に収まることを確認
+- リファクタリング前後の**厳密な一致は期待しない**
 
-## Test Strategy
+## テスト戦略
 
-### Phase 1: Unit Tests (Module-level tests)
+### Phase 1: Unit Tests (モジュール単位のテスト)
 
-Verify each module works correctly.
+各モジュールが正しく動作することを確認します。
 
 #### 1.1 Configuration Module (`gns/config.py`)
 
-**Purpose**: Verify configuration class is correctly generated from metadata
+**目的**: 設定クラスがメタデータから正しく生成されることを確認
 
 ```python
 # tests/test_config.py
@@ -72,9 +72,9 @@ def test_config_validation():
 
 #### 1.2 Model Architecture (`gns/learned_simulator.py`)
 
-**Purpose**: Verify model forward computation works correctly
+**目的**: モデルの前向き計算が正しく動作することを確認
 
-**Note**: Since class separation in Step 2 was reverted, we only test `LearnedSimulator`.
+**注**: Step 2でのクラス分割はrevertされたため、`LearnedSimulator`のみをテストします。
 
 ```python
 # tests/test_model.py
@@ -119,7 +119,7 @@ def test_learned_simulator_deterministic():
 
 #### 1.3 Training Utilities (`gns/training.py`)
 
-**Purpose**: Verify training loop and utilities work correctly
+**目的**: トレーニングループとユーティリティが正しく動作することを確認
 
 ```python
 # tests/test_training.py
@@ -157,7 +157,7 @@ def test_acceleration_loss():
 
 #### 1.4 Rollout/Inference (`gns/rollout.py`, `gns/inference_utils.py`)
 
-**Purpose**: Verify rollout functionality works correctly
+**目的**: ロールアウト機能が正しく動作することを確認
 
 ```python
 # tests/test_rollout.py
@@ -192,7 +192,7 @@ def test_rollout_deterministic():
 
 #### 1.5 Rendering (`gns/render.py`)
 
-**Purpose**: Verify rendering functionality works correctly
+**目的**: レンダリング機能が正しく動作することを確認
 
 ```python
 # tests/test_render.py
@@ -221,13 +221,13 @@ def test_prepare_trajectory_data():
 
 ---
 
-### Phase 2: Integration Tests
+### Phase 2: Integration Tests (統合テスト)
 
-Verify multiple modules work together.
+複数のモジュールが連携して動作することを確認します。
 
 #### 2.1 End-to-End Training Test
 
-**Purpose**: Verify entire training pipeline works
+**目的**: 訓練パイプライン全体が動作することを確認
 
 ```python
 # tests/integration/test_training_pipeline.py
@@ -259,7 +259,7 @@ def test_training_pipeline_short():
 
 #### 2.2 End-to-End Inference Test
 
-**Purpose**: Verify entire inference pipeline works
+**目的**: 推論パイプライン全体が動作することを確認
 
 ```python
 # tests/integration/test_inference_pipeline.py
@@ -293,13 +293,13 @@ def test_inference_pipeline():
 
 ---
 
-### Phase 3: Equivalence Tests
+### Phase 3: Equivalence Tests (等価性テスト)
 
-Verify same results are obtained before and after refactoring.
+リファクタリング前後で同じ結果が得られることを確認します。
 
 #### 3.1 Checkpoint Loading Equivalence
 
-**Purpose**: Verify checkpoints from before refactoring can be loaded correctly
+**目的**: リファクタリング前のチェックポイントが正しく読み込めることを確認
 
 ```python
 # tests/equivalence/test_checkpoint_compatibility.py
@@ -328,13 +328,13 @@ def test_load_old_checkpoint():
 
 #### 3.2 Prediction Equivalence (Rollout Only)
 
-**Purpose**: Verify inference (rollout) is deterministic
+**目的**: 推論（ロールアウト）が決定論的であることを確認
 
-**Important**: Since noise is not used during inference, we expect **exact match**.
+**重要**: 推論時はノイズを使用しないため、**完全一致**を期待します。
 
 ### Step 4: Create Equivalence Test
 
-Create equivalence test (execute in test environment outside repository):
+等価性テストを作成（リポジトリ外のテスト環境で実行）:
 
 ```python
 # equivalence-tests/tests/test_equivalence.py
@@ -459,16 +459,16 @@ if __name__ == "__main__":
     test_rollout_equivalence()
 ```
 
-**Expected Results:**
-- ✅ Exact match: Refactoring is correct
-- ⚠️ Floating point error range: Acceptable (different operation order, etc.)
-- ❌ Large difference: Refactoring has bugs
+**期待される結果:**
+- ✅ 完全一致: リファクタリングが正しい
+- ⚠️ 浮動小数点誤差程度の差異: 許容範囲（演算順序の違いなど）
+- ❌ 大きな差異: リファクタリングにバグあり
 
 #### 3.3 Training Validity (Without Seed Control)
 
-**Purpose**: Verify training works correctly and loss decreases
+**目的**: 訓練が正常に動作し、lossが減少することを確認
 
-**Important**: Since there's no random seed control, **we don't test exact reproducibility**. Instead, we verify training validity.
+**重要**: 乱数シード制御がないため、**厳密な再現性はテストしません**。代わりに、訓練の妥当性を確認します。
 
 ```python
 # tests/equivalence/test_training_validity.py
@@ -543,19 +543,19 @@ def test_training_loss_decreases():
     assert late_loss < early_loss, "Loss should decrease"
 ```
 
-**Expected Behavior:**
-- ✅ Loss decreases
-- ❌ Exact reproducibility is **not expected**
+**期待される動作:**
+- ✅ Lossが減少
+- ❌ 厳密な再現性は**期待しない**
 
 ---
 
-### Phase 4: Performance Tests
+### Phase 4: Performance Tests (性能テスト)
 
-Verify performance is maintained after refactoring.
+リファクタリング後も性能が維持されていることを確認します。
 
 #### 4.1 Training Speed
 
-**Purpose**: Verify training speed hasn't degraded significantly
+**目的**: 訓練速度が大幅に低下していないことを確認
 
 ```python
 # tests/performance/test_training_speed.py
@@ -584,7 +584,7 @@ def test_training_iteration_speed(benchmark):
 
 #### 4.2 Inference Speed
 
-**Purpose**: Verify inference speed hasn't degraded significantly
+**目的**: 推論速度が大幅に低下していないことを確認
 
 ```python
 # tests/performance/test_inference_speed.py
@@ -618,12 +618,12 @@ def test_rollout_speed(benchmark):
 
 ### Setup Requirements
 
-1. **Test Data**: Prepare small-scale test dataset
-   - `test_data/WaterDrop/` - Training samples
-   - `test_data/reference_rollout.pkl` - Reference output from before refactoring
-   - `test_data/old_checkpoint.pth` - Checkpoint from before refactoring
+1. **Test Data**: 小規模なテストデータセットを準備
+   - `test_data/WaterDrop/` - 訓練用サンプル
+   - `test_data/reference_rollout.pkl` - リファクタリング前の参照出力
+   - `test_data/old_checkpoint.pth` - リファクタリング前のチェックポイント
 
-2. **Dependencies**: Install pytest, pytest-benchmark
+2. **Dependencies**: pytest, pytest-benchmark をインストール
    ```bash
    uv add --dev pytest pytest-benchmark pytest-cov
    ```
@@ -655,65 +655,65 @@ def test_rollout_speed(benchmark):
 
 ### Execution Order
 
-1. **Phase 1: Unit Tests** (Required)
+1. **Phase 1: Unit Tests** (必須)
    ```bash
    pytest tests/test_*.py -v
    ```
-   - Verify all modules work individually
+   - すべてのモジュールが個別に動作することを確認
 
-2. **Phase 2: Integration Tests** (Required)
+2. **Phase 2: Integration Tests** (必須)
    ```bash
    pytest tests/integration/ -v
    ```
-   - Verify entire pipeline works
+   - パイプライン全体が動作することを確認
 
-3. **Phase 3: Equivalence Tests** (Important)
+3. **Phase 3: Equivalence Tests** (重要)
    ```bash
    pytest tests/equivalence/ -v -m slow
    ```
-   - Verify same results before and after refactoring
-   - **This is the most important test**
+   - リファクタリング前後で同じ結果が得られることを確認
+   - **これが最も重要なテスト**
 
-4. **Phase 4: Performance Tests** (Optional)
+4. **Phase 4: Performance Tests** (オプション)
    ```bash
    pytest tests/performance/ -v -m benchmark
    ```
-   - Verify no performance degradation
+   - 性能低下がないことを確認
 
 ### Success Criteria
 
-Criteria for determining refactoring success:
+リファクタリングが成功したと判断する基準：
 
-✅ **Phase 1-2**: All tests pass
+✅ **Phase 1-2**: すべてのテストがパス
 ✅ **Phase 3**:
-   - Checkpoint loading succeeds
-   - Prediction results match reference output (relative error < 1e-5)
-   - Training reproducibility is guaranteed
-✅ **Phase 4**: Performance degradation < 10%
+   - チェックポイント読み込みが成功
+   - 予測結果が参照出力と一致（相対誤差 < 1e-5）
+   - 訓練の再現性が保証される
+✅ **Phase 4**: 性能低下が10%未満
 
 ---
 
 ## Test Environment Setup (Recommended)
 
-This repository uses git worktree, with pre-refactoring code at `../main`.
+このリポジトリはgit worktreeを使用しており、リファクタリング前のコードが `../main` に存在します。
 
-**Recommended Approach**: Create independent test environment outside repository and treat both codes equally.
+**推奨アプローチ**: リポジトリ外に独立したテスト環境を作成し、両方のコードを対等に扱います。
 
 ### Directory Structure
 
 ```
 repos/gns/
-├── main/                    # Pre-refactoring code (reference only)
-├── wt-cleanup/             # Post-refactoring code (reference only)
-└── equivalence-tests/      # ★ Test execution environment ★ (outside repository)
+├── main/                    # リファクタリング前のコード (参照のみ)
+├── wt-cleanup/             # リファクタリング後のコード (参照のみ)
+└── equivalence-tests/      # ★テスト実行環境★ (リポジトリ外)
     ├── test_data/
-    │   ├── WaterDropSample/      # Test data
-    │   ├── old_results/          # Old code execution results
-    │   └── new_results/          # New code execution results
+    │   ├── WaterDropSample/      # テストデータ
+    │   ├── old_results/          # 旧コードの実行結果
+    │   └── new_results/          # 新コードの実行結果
     ├── tests/
     │   ├── __init__.py
     │   ├── conftest.py
-    │   └── test_equivalence.py   # Equivalence test
+    │   └── test_equivalence.py   # 等価性テスト
     ├── pytest.ini
     └── README.md
 ```
@@ -738,19 +738,19 @@ pip install torch numpy matplotlib pytest
 
 ### Step 2: Link WaterDropSample Data
 
-Create symbolic link to existing WaterDropSample data:
+既存のWaterDropSampleデータへのシンボリックリンクを作成：
 
 ```bash
 cd equivalence-tests
-# Adjust according to WaterDropSample data location
+# WaterDropSampleデータの場所に応じて調整
 ln -s /path/to/WaterDropSample test_data/WaterDropSample
 ```
 
 ### Step 3: Generate Reference Data with Old Code
 
-Generate reference data with pre-refactoring code (`main/`):
+リファクタリング前のコード (`main/`) で参照データを生成：
 
-**Important**: Old code uses `absl.app`, so execute as CLI rather than calling directly from Python script.
+**重要**: 旧コードは `absl.app` を使用しているため、Pythonスクリプトから直接呼び出すのではなく、CLIとして実行します。
 
 ```bash
 cd equivalence-tests
@@ -772,18 +772,18 @@ python ../main/gns/train.py \
   --num_rollouts=1
 ```
 
-Generated files:
-- `test_data/old_results/model/model-10.pt` - Checkpoint trained with old code
-- `test_data/old_results/rollout/rollout_ex0.pkl` - Rollout generated with old code (example 0)
+生成されるファイル:
+- `test_data/old_results/model/model-10.pt` - 旧コードで訓練したチェックポイント
+- `test_data/old_results/rollout/rollout_ex0.pkl` - 旧コードで生成したロールアウト (example 0)
 
-**Note**: Old code uses absl, so `absl-py` must be installed in environment:
+**注意**: 旧コードはabslを使用しているため、環境に`absl-py`がインストールされている必要があります:
 ```bash
 pip install absl-py
 ```
 
 ### Step 5: Run Equivalence Test
 
-Execute test:
+テストを実行：
 
 ```bash
 cd equivalence-tests
@@ -795,12 +795,12 @@ pytest tests/test_equivalence.py -v
 python tests/test_equivalence.py
 ```
 
-**Expected Output:**
+**期待される出力:**
 ```
 ✅ Rollouts match exactly!
 ```
 
-Or
+または
 
 ```
 ⚠️  Rollouts differ:
@@ -811,19 +811,19 @@ Or
 
 ### Summary: Test Execution Location
 
-With this approach, tests execute in **independent environment outside repository**:
+このアプローチでは、テストは**リポジトリ外の独立した環境**で実行されます：
 
-| Location | Purpose | Test Execution |
-|----------|---------|----------------|
-| `main/` | Old code | ❌ Don't execute (reference data generation only) |
-| `wt-cleanup/` | New code | ❌ Don't execute (import only) |
-| `equivalence-tests/` | Test environment | ✅ **Execute here** |
+| 場所 | 用途 | テスト実行 |
+|------|------|-----------|
+| `main/` | 旧コード | ❌ 実行しない（参照データ生成のみ） |
+| `wt-cleanup/` | 新コード | ❌ 実行しない（インポートのみ） |
+| `equivalence-tests/` | テスト環境 | ✅ **ここで実行** |
 
-**Benefits:**
-- Repository stays clean (no `test_data/` or `tests/` needed)
-- Treats both codes equally
-- Strict testing in clean environment
-- No `.gitignore` adjustments needed
+**メリット:**
+- リポジトリが汚れない（`test_data/`や`tests/`が不要）
+- 両方のコードを対等に扱える
+- クリーンな環境で厳密なテスト
+- `.gitignore`の調整不要
 
 ---
 
@@ -831,7 +831,7 @@ With this approach, tests execute in **independent environment outside repositor
 
 ### CI Integration
 
-Automatically run tests with GitHub Actions workflow:
+GitHub Actions ワークフローでテストを自動実行：
 
 ```yaml
 # .github/workflows/test.yml
@@ -869,7 +869,7 @@ jobs:
 
 ## Notes
 
-- **Numerical Stability**: Account for floating point arithmetic errors, compare with `rtol=1e-5, atol=1e-6`
-- **Randomness**: Fix random seeds in all tests to guarantee deterministic results
-- **Test Data Size**: Test with small-scale data to reduce execution time
-- **Reference Data**: Save reference data generated with pre-refactoring code and verify equivalence
+- **Numerical Stability**: 浮動小数点演算の誤差を考慮して、`rtol=1e-5, atol=1e-6` で比較
+- **Randomness**: すべてのテストで乱数シードを固定してdeterministicな結果を保証
+- **Test Data Size**: 小規模データでテストし、実行時間を短縮
+- **Reference Data**: リファクタリング前のコードで生成した参照データを保存し、等価性を検証

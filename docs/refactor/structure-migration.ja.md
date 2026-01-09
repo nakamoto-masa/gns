@@ -1,8 +1,8 @@
 # GNS Codebase Structure Migration
 
-This document illustrates how responsibilities were reorganized through refactoring.
+このドキュメントは、リファクタリングによって役割がどのように再配置されたかを示します。
 
-## Bipartite Graph: File Structure Migration
+## 二部グラフ: ファイル構造の移行
 
 ```mermaid
 %%{init: {'theme':'base', 'themeVariables': { 'fontSize':'14px'}}}%%
@@ -72,41 +72,41 @@ graph LR
     class NEW_ARCHIVED archivedStyle
 ```
 
-**Legend:**
-- 🔴 **Red**: Pre-refactoring execution scripts (located in gns/, mixed business logic and CLI)
-- 🟢 **Green**: Post-refactoring reusable modules (gns/)
-- 🔵 **Blue**: Post-refactoring CLI wrappers (scripts/)
-- 🟡 **Yellow**: New package management system
-- ⚫ **Gray**: Archived files
+**凡例:**
+- 🔴 **赤**: リファクタリング前の実行スクリプト（gns/内に配置、ビジネスロジックとCLIが混在）
+- 🟢 **緑**: リファクタリング後の再利用可能モジュール (gns/)
+- 🔵 **青**: リファクタリング後のCLIラッパー (scripts/)
+- 🟡 **黄**: 新しいパッケージ管理システム
+- ⚫ **灰**: アーカイブされたファイル
 
-**Key Changes:**
-- **Execution scripts**: `gns/train.py` (658 lines) + `gns/train_multinode.py` (661 lines) + `gns/render_rollout.py` (246 lines) → Modularized logic + thin CLI wrappers (scripts/: 181, 212, 58 lines)
+**主な変更:**
+- **実行スクリプト**: `gns/train.py` (658行) + `gns/train_multinode.py` (661行) + `gns/render_rollout.py` (246行) → ロジックをモジュール化 + 薄いCLIラッパー (scripts/: 181, 212, 58行)
 
-## Major Changes
+## 主要な変更点
 
-### Separated Responsibilities
+### 分離された責務
 
 1. **Configuration** (gns/train.py, gns/train_multinode.py → gns/config.py)
-   - Unified duplicated global constants into a configuration class
+   - 重複していたグローバル定数を統一された設定クラスに変換
 
 2. **Training** (gns/train.py, gns/train_multinode.py → gns/training.py)
-   - Training loop and utilities
-   - Extracted common logic for single-GPU/distributed training
-   - Dataloader management
-   - Checkpoint management
+   - トレーニングループとユーティリティ
+   - 単一GPU/分散訓練の共通ロジック抽出
+   - データローダー管理
+   - チェックポイント管理
 
 3. **Rollout/Inference** (gns/train.py, gns/train_multinode.py → gns/rollout.py + gns/inference_utils.py)
-   - Unified rollout execution logic
-   - Separated trajectory prediction utilities
+   - ロールアウト実行ロジックの共通化
+   - 軌道予測ユーティリティの分離
 
 4. **Rendering** (gns/render_rollout.py → gns/render.py)
-   - Separated visualization logic from CLI
-   - GIF, VTK, and image rendering functionality
+   - 可視化ロジックとCLIの分離
+   - GIF、VTK、画像レンダリング機能
 
 5. **CLI** (gns/*.py → scripts/*.py)
-   - Thin CLI wrappers (56-250 lines)
-   - Delegate business logic to above modules
-   - Moved from gns/ directory to scripts/ directory
+   - 薄いCLIラッパー（56-250行）
+   - ビジネスロジックを上記モジュールに委譲
+   - gns/ディレクトリからscripts/ディレクトリへ移動
 
 6. **Environment** (legacy/*.sh → pyproject.toml)
-   - Modern package management with uv
+   - uvによるモダンなパッケージ管理

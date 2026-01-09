@@ -8,15 +8,18 @@ This directory contains documentation related to the refactoring of the GNS mode
 
 - [refactoring-policy.md](refactoring-policy.md) / [.ja.md](refactoring-policy.ja.md) - Refactoring policy and purpose
 - [initial-issues.md](initial-issues.md) / [.ja.md](initial-issues.ja.md) - Issues before refactoring
-- [equivalence-testing-overview.md](equivalence-testing-overview.md) / [.ja.md](equivalence-testing-overview.ja.md) - Equivalence testing overview
 - [CLAUDE.md](CLAUDE.md) - Instructions for Claude
 
 ## Planning Documents
 
 - [plan.md](plan.md) / [plan.ja.md](plan.ja.md) - Detailed refactoring plan
+- [tasks.md](tasks.md) / [.ja.md](tasks.ja.md) - Task list and implementation status
 - [equivalence-testing-plan.md](equivalence-testing-plan.md) / [.ja.md](equivalence-testing-plan.ja.md) - Equivalence testing plan
-- [structure-migration.md](structure-migration.md) / [.ja.md](structure-migration.ja.md) - Directory structure migration plan
-- [tasks.md](tasks.md) / [.ja.md](tasks.ja.md) - Task list
+- [equivalence-testing-overview.md](equivalence-testing-overview.md) / [.ja.md](equivalence-testing-overview.ja.md) - Equivalence testing overview
+
+## Results & Analysis Documents
+
+- [refactoring-results.md](refactoring-results.md) / [.ja.md](refactoring-results.ja.md) - Code structure changes after refactoring
 
 ## Subdirectories
 

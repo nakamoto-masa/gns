@@ -329,29 +329,49 @@ def test_load_old_checkpoint():
 
 **重要**: 推論時はノイズを使用しないため、**完全一致**を期待します。
 
-```python
-# tests/equivalence/test_prediction_equivalence.py
+### Step 4: Create Equivalence Test
 
-@pytest.mark.slow
-def test_rollout_predictions_match():
+等価性テストを作成（リポジトリ外のテスト環境で実行）:
+
+```python
+# equivalence-tests/tests/test_equivalence.py
+"""Test equivalence between old and new code
+
+This test runs in a separate environment outside the repositories.
+It imports both old code (from ../main) and new code (from ../wt-cleanup)
+and compares their outputs.
+"""
+import sys
+import numpy as np
+import torch
+import pickle
+
+# Add both code paths
+sys.path.insert(0, '../wt-cleanup')  # New code
+sys.path.insert(1, '../main')       # Old code (for reference only)
+
+# Import NEW code
+from gns import config, training, rollout
+
+def test_rollout_equivalence():
     """Test rollout predictions match between old and new code
 
     IMPORTANT: Rollout inference is deterministic (no noise).
     We expect EXACT match, not just close approximation.
 
-    This test requires:
-    1. A checkpoint trained with old code
-    2. A reference rollout generated with old code (same checkpoint, same input)
+    This test:
+    1. Loads a checkpoint trained with OLD code
+    2. Loads reference rollout generated with OLD code
+    3. Runs rollout with NEW code using the same checkpoint
+    4. Compares outputs
     """
-    import sys
-    import numpy as np
-    import torch
-    from gns import config, training, rollout
 
-    # Load reference data (generated with old code)
-    reference_data = np.load("test_data/reference_rollout.pkl", allow_pickle=True)
-    reference_rollout = reference_data['predicted_rollout']  # Shape: (nsteps, nparticles, dim)
-    initial_positions = reference_data['initial_positions']  # Shape: (sequence_length, nparticles, dim)
+    # Load reference rollout (generated with OLD code)
+    with open("test_data/old_results/rollout/rollout_0.pkl", "rb") as f:
+        reference_data = pickle.load(f)
+
+    reference_rollout = reference_data['predicted_rollout']
+    initial_positions = reference_data['initial_positions']
     particle_types = reference_data['particle_types']
 
     # Load metadata
@@ -363,8 +383,11 @@ def test_rollout_predictions_match():
     simulator_config = config.SimulatorConfig.from_metadata(metadata)
     simulator = training.get_simulator(simulator_config, device=torch.device('cpu'))
 
-    # Load checkpoint (trained with old code)
-    checkpoint = torch.load("test_data/old_checkpoint.pth", map_location='cpu')
+    # Load checkpoint (trained with OLD code)
+    checkpoint = torch.load(
+        "test_data/old_results/model/model-10.pt",
+        map_location='cpu'
+    )
     simulator.load_state_dict(checkpoint['model_state_dict'])
     simulator.eval()
 
@@ -386,22 +409,22 @@ def test_rollout_predictions_match():
     predicted_np = predicted_rollout.cpu().numpy()
 
     # EXACT match expected (rollout is deterministic)
-    # Use assert_array_equal for exact comparison
     try:
         np.testing.assert_array_equal(
             predicted_np,
             reference_rollout,
-            err_msg="Rollout should be EXACTLY identical (inference is deterministic)"
+            err_msg="Rollout should be EXACTLY identical"
         )
-        print("✓ Rollouts match exactly!")
+        print("✅ Rollouts match exactly!")
+        return True
     except AssertionError:
         # If not exactly equal, check how close they are
         max_diff = np.abs(predicted_np - reference_rollout).max()
         mean_diff = np.abs(predicted_np - reference_rollout).mean()
 
-        print(f"✗ Rollouts differ:")
-        print(f"  Max difference: {max_diff}")
-        print(f"  Mean difference: {mean_diff}")
+        print(f"⚠️  Rollouts differ:")
+        print(f"   Max difference: {max_diff}")
+        print(f"   Mean difference: {mean_diff}")
 
         # Check if within floating point tolerance
         np.testing.assert_allclose(
@@ -411,7 +434,11 @@ def test_rollout_predictions_match():
             atol=1e-7,
             err_msg=f"Rollouts should match within FP precision (max_diff={max_diff})"
         )
-        print("✓ Rollouts match within floating point precision")
+        print("✅ Rollouts match within floating point precision")
+        return True
+
+if __name__ == "__main__":
+    test_rollout_equivalence()
 ```
 
 **期待される結果:**
@@ -648,179 +675,159 @@ def test_rollout_speed(benchmark):
 
 ---
 
-## Reference Data Generation Using Worktree
+## Test Environment Setup (Recommended)
 
 このリポジトリはgit worktreeを使用しており、リファクタリング前のコードが `../main` に存在します。
-これを活用して、リファクタリング前後のコードを同時に使用したテストが可能です。
 
-### Setup: Shared Test Data
+**推奨アプローチ**: リポジトリ外に独立したテスト環境を作成し、両方のコードを対等に扱います。
 
-WaterDropSample データを両方のworktreeで共有できるようにシンボリックリンクを作成：
+### Directory Structure
+
+```
+repos/gns/
+├── main/                    # リファクタリング前のコード (参照のみ)
+├── wt-cleanup/             # リファクタリング後のコード (参照のみ)
+└── equivalence-tests/      # ★テスト実行環境★ (リポジトリ外)
+    ├── test_data/
+    │   ├── WaterDropSample/      # テストデータ
+    │   ├── old_results/          # 旧コードの実行結果
+    │   └── new_results/          # 新コードの実行結果
+    ├── tests/
+    │   ├── __init__.py
+    │   ├── conftest.py
+    │   └── test_equivalence.py   # 等価性テスト
+    ├── pytest.ini
+    └── README.md
+```
+
+### Setup: Create Test Environment
 
 ```bash
-# Create test data directory in refactored worktree
-mkdir -p test_data
+# Create test environment directory (outside repositories)
+cd /Users/masahiro/repos/gns
+mkdir -p equivalence-tests
+cd equivalence-tests
 
-# If you have WaterDropSample data somewhere, link it
-# Option 1: If data exists in main worktree
-ln -s ../main/datasets/WaterDropSample test_data/WaterDropSample
+# Create directory structure
+mkdir -p test_data/{old_results,new_results}
+mkdir -p tests
 
-# Option 2: If data exists elsewhere
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate
+pip install torch numpy matplotlib pytest
+```
+
+### Step 2: Link WaterDropSample Data
+
+既存のWaterDropSampleデータへのシンボリックリンクを作成：
+
+```bash
+cd equivalence-tests
+# WaterDropSampleデータの場所に応じて調整
 ln -s /path/to/WaterDropSample test_data/WaterDropSample
-
-# Option 3: Create minimal test data (see below)
 ```
 
-### Creating Minimal Test Data
+### Step 3: Generate Reference Data with Old Code
 
-WaterDropSampleデータがない場合、最小限のテストデータを作成：
-
-```python
-# scripts/create_minimal_test_data.py
-"""Create minimal test dataset for equivalence testing"""
-
-import os
-import numpy as np
-import json
-
-def create_minimal_test_data(output_dir="test_data/WaterDropSample"):
-    """Create minimal dataset with 1 trajectory, 100 particles, 10 steps"""
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Metadata
-    metadata = {
-        "bounds": [[0.1, 0.9], [0.1, 0.9]],
-        "sequence_length": 6,
-        "default_connectivity_radius": 0.015,
-        "dim": 2,
-        "dt": 0.0025,
-        "vel_mean": [5.123277536458455e-06, -0.0009965205918140803],
-        "vel_std": [0.0021978993231675805, 0.0026653552458701774],
-        "acc_mean": [5.237611158734864e-07, 2.3633027988858656e-07],
-        "acc_std": [0.0002582944917306106, 0.00029554531667679154]
-    }
-
-    with open(f"{output_dir}/metadata.json", "w") as f:
-        json.dump(metadata, f)
-
-    # Create train/valid/test splits with minimal data
-    for split in ["train", "valid", "test"]:
-        split_dir = f"{output_dir}/{split}"
-        os.makedirs(split_dir, exist_ok=True)
-
-        # Single trajectory: 100 particles, 10 timesteps
-        num_particles = 100
-        num_steps = 10
-
-        # Random positions (2D)
-        positions = np.random.rand(num_steps, num_particles, 2) * 0.8 + 0.1
-
-        # Particle types (mix of types)
-        particle_types = np.random.choice([0, 1, 3, 5], size=num_particles)
-
-        # Save as .npz
-        np.savez(
-            f"{split_dir}/sample_0.npz",
-            positions=positions.astype(np.float32),
-            particle_type=particle_types.astype(np.int32)
-        )
-
-    print(f"Created minimal test data in {output_dir}")
-
-if __name__ == "__main__":
-    create_minimal_test_data()
-```
-
-Run it:
-```bash
-python scripts/create_minimal_test_data.py
-```
-
-### 1. Generate Reference Data with Old Code
-
-リファクタリング前のコード (`../main`) で参照データを生成：
+リファクタリング前のコード (`main/`) で参照データを生成：
 
 ```bash
-# Move to main worktree
-cd ../main
+cd equivalence-tests
 
-# Install dependencies (if not already)
-# Use the same Python environment or create a separate one
-python -m venv .venv-main
-source .venv-main/bin/activate
-pip install torch numpy matplotlib pyevtk
-
-# Train a small model (10 steps for testing)
-python gns/train.py \
-  --mode=train \
-  --data_path=../wt-cleanup/test_data/WaterDropSample \
-  --model_path=../wt-cleanup/test_data/old_model \
-  --ntraining_steps=10
-
-# Generate reference rollout
-python gns/train.py \
-  --mode=rollout \
-  --data_path=../wt-cleanup/test_data/WaterDropSample \
-  --model_path=../wt-cleanup/test_data/old_model \
-  --model_file=model-10.pt \
-  --output_path=../wt-cleanup/test_data/reference_rollout \
-  --num_rollouts=1
-
-# Return to refactored worktree
-cd ../wt-cleanup
-```
-
-これで以下のファイルが生成されます：
-- `test_data/old_model/model-10.pt` - リファクタリング前のコードで訓練したチェックポイント
-- `test_data/reference_rollout/rollout_0.pkl` - リファクタリング前のコードで生成したロールアウト
-
-### 2. Alternative: Generate Reference via Python Script
-
-より制御可能な方法として、Pythonスクリプトで参照データを生成：
-
-```python
-# scripts/generate_reference_data.py
-"""Generate reference data using old code from ../main worktree"""
-
+# Create reference generation script
+cat > generate_old_results.py << 'EOF'
+"""Generate reference data using old code from main worktree"""
 import sys
-import os
-
-# Add old code path
 sys.path.insert(0, '../main')
 
 import torch
 import numpy as np
+import pickle
 
-# Import from old code
-from gns.train import get_simulator, train_one_step  # old implementation
+# Import from OLD code
+from gns import train as old_train
 
-def generate_reference_training_data():
-    """Generate reference training losses"""
-    # Setup (using old code)
-    simulator = get_simulator(...)  # old implementation
-    optimizer = torch.optim.Adam(simulator.parameters(), lr=1e-4)
+def generate_reference_rollout():
+    """Train a small model and generate reference rollout with OLD code"""
 
-    # Train for 100 steps
-    losses = []
-    for step in range(100):
-        loss = train_one_step(simulator, optimizer, ...)
-        losses.append(loss.item())
+    # Train model (10 steps)
+    print("Training model with OLD code...")
+    old_train.main([
+        '--mode=train',
+        '--data_path=test_data/WaterDropSample',
+        '--model_path=test_data/old_results/model',
+        '--ntraining_steps=10'
+    ])
 
-    # Save reference
-    np.save('test_data/reference_losses.npy', losses)
-    torch.save(simulator.state_dict(), 'test_data/old_checkpoint.pth')
+    # Generate rollout
+    print("Generating rollout with OLD code...")
+    old_train.main([
+        '--mode=rollout',
+        '--data_path=test_data/WaterDropSample',
+        '--model_path=test_data/old_results/model',
+        '--model_file=model-10.pt',
+        '--output_path=test_data/old_results/rollout',
+        '--num_rollouts=1'
+    ])
 
-    print(f"Generated reference data: {len(losses)} training steps")
+    print("✓ Reference data generated in test_data/old_results/")
 
 if __name__ == "__main__":
-    generate_reference_training_data()
+    generate_reference_rollout()
+EOF
+
+# Run it
+python generate_old_results.py
 ```
 
-Run from refactored worktree:
+生成されるファイル:
+- `test_data/old_results/model/model-10.pt` - 旧コードで訓練したチェックポイント
+- `test_data/old_results/rollout/rollout_0.pkl` - 旧コードで生成したロールアウト
+
+### Step 5: Run Equivalence Test
+
+テストを実行：
+
 ```bash
-cd wt-cleanup
-python scripts/generate_reference_data.py
+cd equivalence-tests
+
+# Option 1: Run with pytest
+pytest tests/test_equivalence.py -v
+
+# Option 2: Run as Python script
+python tests/test_equivalence.py
 ```
+
+**期待される出力:**
+```
+✅ Rollouts match exactly!
+```
+
+または
+
+```
+⚠️  Rollouts differ:
+   Max difference: 1.234e-07
+   Mean difference: 5.678e-09
+✅ Rollouts match within floating point precision
+```
+
+### Summary: Test Execution Location
+
+このアプローチでは、テストは**リポジトリ外の独立した環境**で実行されます：
+
+| 場所 | 用途 | テスト実行 |
+|------|------|-----------|
+| `main/` | 旧コード | ❌ 実行しない（参照データ生成のみ） |
+| `wt-cleanup/` | 新コード | ❌ 実行しない（インポートのみ） |
+| `equivalence-tests/` | テスト環境 | ✅ **ここで実行** |
+
+**メリット:**
+- リポジトリが汚れない（`test_data/`や`tests/`が不要）
+- 両方のコードを対等に扱える
+- クリーンな環境で厳密なテスト
+- `.gitignore`の調整不要
 
 ---
 

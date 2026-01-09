@@ -82,7 +82,7 @@ def run_rollout(
 
     Args:
         simulator: Learned simulator model.
-        position: Initial positions (timesteps, nparticles, ndims).
+        position: Initial positions (nparticles, timesteps, ndims).
         particle_type: Particle type IDs (nparticles,).
         material_property: Material properties (nparticles,) or None.
         n_particles_per_example: Number of particles.
@@ -312,7 +312,7 @@ def rollout(
 
     Args:
         simulator: Learned simulator.
-        position: Positions of particles (timesteps, nparticles, ndims).
+        position: Positions of particles (nparticles, timesteps, ndims).
         particle_types: Particles types with shape (nparticles).
         material_property: Friction angle normalized by tan() with shape (nparticles).
         n_particles_per_example: Number of particles per example.

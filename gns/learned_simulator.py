@@ -3,7 +3,6 @@ import torch.nn as nn
 import numpy as np
 from gns import graph_network
 from torch_geometric.nn import radius_graph
-from typing import Dict
 
 
 class LearnedSimulator(nn.Module):
@@ -24,7 +23,7 @@ class LearnedSimulator(nn.Module):
           nparticle_types: int,
           particle_type_embedding_size: int,
           boundary_clamp_limit: float = 1.0,
-          device="cpu"
+          device: str = "cpu"
   ):
     """Initializes the model.
 
@@ -78,8 +77,8 @@ class LearnedSimulator(nn.Module):
 
   def _compute_graph_connectivity(
           self,
-          node_features: torch.tensor,
-          nparticles_per_example: torch.tensor,
+          node_features: torch.Tensor,
+          nparticles_per_example: torch.Tensor,
           radius: float,
           add_self_edges: bool = True):
     """Generate graph edges to all particles within a threshold radius
@@ -110,10 +109,10 @@ class LearnedSimulator(nn.Module):
 
   def _encoder_preprocessor(
           self,
-          position_sequence: torch.tensor,
-          nparticles_per_example: torch.tensor,
-          particle_types: torch.tensor,
-          material_property: torch.tensor = None):
+          position_sequence: torch.Tensor,
+          nparticles_per_example: torch.Tensor,
+          particle_types: torch.Tensor,
+          material_property: torch.Tensor | None = None):
     """Extracts important features from the position sequence. Returns a tuple
     of node_features (nparticles, 30), edge_index (nparticles, nparticles), and
     edge_features (nparticles, 3).
@@ -208,8 +207,8 @@ class LearnedSimulator(nn.Module):
 
   def _decoder_postprocessor(
           self,
-          normalized_acceleration: torch.tensor,
-          position_sequence: torch.tensor) -> torch.tensor:
+          normalized_acceleration: torch.Tensor,
+          position_sequence: torch.Tensor) -> torch.Tensor:
     """ Compute new position based on acceleration and current position.
     The model produces the output in normalized space so we apply inverse
     normalization.
@@ -240,10 +239,10 @@ class LearnedSimulator(nn.Module):
 
   def predict_positions(
           self,
-          current_positions: torch.tensor,
-          nparticles_per_example: torch.tensor,
-          particle_types: torch.tensor,
-          material_property: torch.tensor = None) -> torch.tensor:
+          current_positions: torch.Tensor,
+          nparticles_per_example: torch.Tensor,
+          particle_types: torch.Tensor,
+          material_property: torch.Tensor | None = None) -> torch.Tensor:
     """Predict position based on acceleration.
 
     Args:
@@ -270,12 +269,12 @@ class LearnedSimulator(nn.Module):
 
   def predict_accelerations(
           self,
-          next_positions: torch.tensor,
-          position_sequence_noise: torch.tensor,
-          position_sequence: torch.tensor,
-          nparticles_per_example: torch.tensor,
-          particle_types: torch.tensor,
-          material_property: torch.tensor = None):
+          next_positions: torch.Tensor,
+          position_sequence_noise: torch.Tensor,
+          position_sequence: torch.Tensor,
+          nparticles_per_example: torch.Tensor,
+          particle_types: torch.Tensor,
+          material_property: torch.Tensor | None = None):
     """Produces normalized and predicted acceleration targets.
 
     Args:
@@ -327,8 +326,8 @@ class LearnedSimulator(nn.Module):
 
   def _inverse_decoder_postprocessor(
           self,
-          next_position: torch.tensor,
-          position_sequence: torch.tensor):
+          next_position: torch.Tensor,
+          position_sequence: torch.Tensor):
     """Inverse of `_decoder_postprocessor`.
 
     Args:
@@ -373,7 +372,7 @@ class LearnedSimulator(nn.Module):
 
 
 def time_diff(
-        position_sequence: torch.tensor) -> torch.tensor:
+        position_sequence: torch.Tensor) -> torch.Tensor:
   """Finite difference between two input position sequence
 
   Args:

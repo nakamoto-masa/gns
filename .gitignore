@@ -1,5 +1,7 @@
 # Models
 *models/*
+# Rollout outputs
+rollouts/
 # Temporary files
 *~*
 *#*

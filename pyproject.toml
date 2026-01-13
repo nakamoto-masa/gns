@@ -1,0 +1,35 @@
+[project]
+name = "gns"
+version = "0.1.0"
+description = "Graph Network-based Simulator"
+requires-python = ">=3.13"
+dependencies = [
+    "absl-py>=2.3.1",
+    "dm-tree>=0.1.9",
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.0",
+    "pyevtk>=1.6.0",
+    "torch==2.8.0",
+    "torch-cluster>=1.6.3",
+    "torch-geometric>=2.7.0",
+    "torch-scatter>=2.1.2",
+    "torch-sparse>=0.6.18",
+    "tqdm>=4.67.1",
+]
+
+[dependency-groups]
+dev = [
+    "autopep8>=2.3.2",
+    "pytest>=9.0.2",
+]
+
+[tool.uv.sources]
+torch_cluster = { index = "pyg-280cpu" }
+torch_scatter = { index = "pyg-280cpu" }
+torch_sparse = { index = "pyg-280cpu" }
+
+[[tool.uv.index]]
+name ="pyg-280cpu"
+url = "https://data.pyg.org/whl/torch-2.8.0+cpu.html"
+format = "flat"
+explicit = true

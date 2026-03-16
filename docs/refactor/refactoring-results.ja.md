@@ -11,7 +11,7 @@ graph LR
         OLD_TRAIN["gns/train.py<br/>(658 lines)<br/>━━━━━━━━━━<br/>• Configuration<br/>• Training Logic<br/>• Rollout Logic<br/>• CLI (single GPU)"]
         OLD_TRAIN_MULTI["gns/train_multinode.py<br/>(661 lines)<br/>━━━━━━━━━━<br/>• Configuration<br/>• Distributed Training<br/>• Rollout Logic<br/>• CLI (multi-node)"]
         OLD_RENDER["gns/render_rollout.py<br/>(246 lines)<br/>━━━━━━━━━━<br/>• Rendering Logic<br/>• CLI"]
-        OLD_LEGACY["legacy/*.sh<br/>━━━━━━━━━━<br/>• build_venv.sh<br/>• module.sh<br/>• run.sh<br/>• start_venv.sh"]
+        OLD_LEGACY["./*.sh (root)<br/>━━━━━━━━━━<br/>• build_venv.sh<br/>• module.sh<br/>• run.sh<br/>• start_venv.sh"]
     end
 
     subgraph AFTER["<b>AFTER: Modular Structure</b>"]
@@ -108,5 +108,5 @@ graph LR
    - ビジネスロジックを上記モジュールに委譲
    - gns/ディレクトリからscripts/ディレクトリへ移動
 
-6. **Environment** (legacy/*.sh → pyproject.toml)
+6. **Environment** (./*.sh → pyproject.toml)
    - uvによるモダンなパッケージ管理
